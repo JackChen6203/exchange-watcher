@@ -128,7 +128,8 @@ jobs:
           # 創建 .env 文件（如果不存在）
           if [ ! -f .env ]; then
             echo '創建 .env 文件...'
-            cp .env.template .env 2>/dev/null || echo 'NODE_ENV=production' > .env
+            cp .env.template .env
+            echo '⚠️ 注意：需要在服務器上手動配置 API 密鑰和 Discord Webhook'
           fi
           
           # 設置 systemd 服務
@@ -149,6 +150,11 @@ jobs:
           # 檢查服務狀態
           echo '檢查服務狀態...'
           sudo systemctl status crypto-monitor --no-pager
+          
+          # 設置自動化監控
+          echo '設置自動化監控...'
+          chmod +x scripts/setup-automation.sh
+          ./scripts/setup-automation.sh
           
           # 運行部署後驗證腳本
           echo '執行部署後驗證...'

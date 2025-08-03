@@ -47,21 +47,25 @@ if [ -f "/home/$USER/crypto-exchange-monitor/.env" ]; then
     if grep -q "DISCORD_WEBHOOK_URL" /home/$USER/crypto-exchange-monitor/.env; then
         if grep -q "your_webhook" /home/$USER/crypto-exchange-monitor/.env; then
             echo "⚠️ Discord Webhook 需要配置實際值"
+            echo "REQUIRE_CONFIG=true" >> /tmp/deploy-status
         else
             echo "✅ Discord Webhook 已配置"
         fi
     else
         echo "❌ 缺少 Discord Webhook 配置"
+        echo "REQUIRE_CONFIG=true" >> /tmp/deploy-status
     fi
     
     if grep -q "API_KEY" /home/$USER/crypto-exchange-monitor/.env; then
         if grep -q "your_api_key" /home/$USER/crypto-exchange-monitor/.env; then
             echo "⚠️ API 密鑰需要配置實際值"
+            echo "REQUIRE_CONFIG=true" >> /tmp/deploy-status
         else
             echo "✅ API 密鑰已配置"
         fi
     else
         echo "❌ 缺少 API 密鑰配置"
+        echo "REQUIRE_CONFIG=true" >> /tmp/deploy-status
     fi
 else
     echo "❌ 環境變數文件不存在"
@@ -129,3 +133,30 @@ echo "  查看日誌: sudo journalctl -u crypto-monitor -f"
 echo "  重啟服務: sudo systemctl restart crypto-monitor"
 echo ""
 echo "⚠️ 如果服務配置不正確，請編輯 .env 文件後重啟服務"
+
+# 如果需要配置，創建配置提醒文件
+if [ -f /tmp/deploy-status ] && grep -q "REQUIRE_CONFIG=true" /tmp/deploy-status; then
+    cat > /home/$USER/crypto-exchange-monitor/CONFIG_REQUIRED.txt << EOF
+🔧 配置所需：
+
+請編輯 .env 文件並填入以下實際值：
+
+1. Discord Webhook URL:
+   前往 Discord 服務器 → 頻道設置 → 整合 → Webhooks
+   創建新 webhook 並複製 URL
+
+2. Bitget API 配置:
+   前往 Bitget → API 管理 → 創建新 API
+   設置 API Key、Secret Key、Passphrase
+
+編輯完成後執行：
+sudo systemctl restart crypto-monitor
+
+刪除此文件表示配置完成：
+rm /home/$USER/crypto-exchange-monitor/CONFIG_REQUIRED.txt
+EOF
+    
+    echo ""
+    echo "📝 已創建配置提醒文件：CONFIG_REQUIRED.txt"
+    rm -f /tmp/deploy-status
+fi
