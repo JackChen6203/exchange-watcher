@@ -21,8 +21,8 @@ class ContractMonitor {
     this.dataUpdateInterval = null;    // 數據更新定時器
     this.fundingRateAlertInterval = null; // 資金費率提醒定時器
     
-    // Discord Webhooks
-    this.positionWebhook = 'https://discord.com/api/webhooks/1384011791914237962/c1hWWCeOgFmt9ZcVKZ0vi2u0yo5KoEJsNgsx0vCAWLd-fxLzHfVg80Ap1NOyTt0SIqMF';
+    // Discord Webhooks - 從環境變數獲取
+    this.positionWebhook = config.discord.positionWebhookUrl || config.discord.webhookUrl;
     
     // 報告間隔配置
     this.reportIntervals = {
@@ -419,7 +419,7 @@ class ContractMonitor {
       timestamp: now.toISOString(),
       footer: {
         text: 'Bitget 合約監控',
-        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png'
+        icon_url: config.discord.icons.chart
       }
     };
 
@@ -443,7 +443,7 @@ class ContractMonitor {
       timestamp: now.toISOString(),
       footer: {
         text: 'Bitget 合約監控',
-        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4b0.png'
+        icon_url: config.discord.icons.money
       }
     };
 
@@ -548,7 +548,7 @@ class ContractMonitor {
         timestamp: now.toISOString(),
         footer: {
           text: 'Bitget 資金費率提醒',
-          icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/23f0.png'
+          icon_url: config.discord.icons.clock
         }
       };
 

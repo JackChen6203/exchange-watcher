@@ -1,0 +1,85 @@
+name: Security & Environment Check
+
+on:
+  push:
+    branches: [ main, master, fix-errors ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  env-security-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check for hardcoded secrets
+      run: |
+        echo "Checking for potential hardcoded secrets..."
+        
+        # 檢查是否有硬編碼的 API 金鑰
+        if grep -r "sk-" --include="*.js" --include="*.json" --exclude-dir=node_modules .; then
+          echo "⚠️  Found potential hardcoded API keys!"
+          exit 1
+        fi
+        
+        # 檢查是否有硬編碼的私鑰
+        if grep -r "BEGIN.*PRIVATE.*KEY" --include="*.js" --include="*.json" --exclude-dir=node_modules .; then
+          echo "⚠️  Found potential hardcoded private keys!"
+          exit 1
+        fi
+        
+        # 檢查是否有硬編碼的密碼
+        if grep -r "password.*=" --include="*.js" --exclude-dir=node_modules . | grep -v "process.env"; then
+          echo "⚠️  Found potential hardcoded passwords!"
+          exit 1
+        fi
+        
+        echo "✅ No hardcoded secrets found!"
+        
+    - name: Check .env usage
+      run: |
+        echo "Checking for proper .env usage..."
+        
+        # 檢查是否所有敏感配置都使用 process.env
+        FILES_WITH_CONFIG=$(find src -name "*.js" -exec grep -l "apiKey\|apiSecret\|webhookUrl\|token" {} \;)
+        
+        for file in $FILES_WITH_CONFIG; do
+          echo "Checking $file..."
+          if grep -E "(apiKey|apiSecret|webhookUrl|token).*=" "$file" | grep -v "process.env"; then
+            echo "⚠️  Found hardcoded config in $file"
+            grep -n -E "(apiKey|apiSecret|webhookUrl|token).*=" "$file" | grep -v "process.env"
+            exit 1
+          fi
+        done
+        
+        echo "✅ All sensitive configs use environment variables!"
+        
+    - name: Verify .env.example exists
+      run: |
+        if [ ! -f ".env.example" ]; then
+          echo "⚠️  .env.example file not found! Creating one..."
+          cat > .env.example << 'EOF'
+        # Bitget API Configuration
+        BITGET_API_KEY=your_api_key_here
+        BITGET_API_SECRET=your_api_secret_here
+        BITGET_PASSPHRASE=your_passphrase_here
+        
+        # Discord Configuration
+        DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
+        
+        # Environment
+        NODE_ENV=production
+        
+        # Database
+        DATABASE_PATH=./data/monitor.db
+        
+        # Logging
+        LOG_LEVEL=info
+        LOG_FILE=./logs/monitor.log
+        EOF
+          echo "✅ Created .env.example file"
+        else
+          echo "✅ .env.example file exists"
+        fi

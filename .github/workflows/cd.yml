@@ -1,0 +1,76 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  release:
+    types: [ published ]
+
+jobs:
+  deploy-to-gcp:
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci --only=production
+      
+    - name: Create deployment package
+      run: |
+        mkdir -p deploy
+        cp -r src deploy/
+        cp -r data deploy/
+        cp package*.json deploy/
+        cp -r node_modules deploy/
+        
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.GCP_SSH_PRIVATE_KEY }}
+        
+    - name: Deploy to GCP
+      run: |
+        ssh -o StrictHostKeyChecking=no JackChen6203@35.212.185.14 "
+          cd /home/JackChen6203/crypto-exchange-monitor || mkdir -p /home/JackChen6203/crypto-exchange-monitor
+          pm2 stop crypto-monitor || true
+        "
+        
+        rsync -avz --delete ./deploy/ JackChen6203@35.212.185.14:/home/JackChen6203/crypto-exchange-monitor/
+        
+        ssh -o StrictHostKeyChecking=no JackChen6203@35.212.185.14 "
+          cd /home/JackChen6203/crypto-exchange-monitor
+          npm install --only=production
+          pm2 start src/index.js --name crypto-monitor || pm2 restart crypto-monitor
+          pm2 save
+        "
+
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run all tests
+      run: npm run test:all
+      env:
+        NODE_ENV: test

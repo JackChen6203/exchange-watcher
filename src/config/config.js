@@ -6,18 +6,26 @@ const config = {
     key: process.env.API_KEY,
     secret: process.env.API_SECRET,
     passphrase: process.env.API_PASSPHRASE,
-    baseUrl: 'https://api.bitget.com',
+    baseUrl: process.env.BITGET_BASE_URL || 'https://api.bitget.com',
     // 現貨WebSocket（用於價格監控）
-    wsUrl: 'wss://ws.bitget.com/spot/v1/stream',
+    wsUrl: process.env.BITGET_WS_URL || 'wss://ws.bitget.com/spot/v1/stream',
     // 合約WebSocket（用於持倉量和資金費率監控）
-    contractWsUrl: 'wss://ws.bitget.com/mix/v1/stream',
+    contractWsUrl: process.env.BITGET_CONTRACT_WS_URL || 'wss://ws.bitget.com/mix/v1/stream',
     // 合約REST API
-    contractRestUrl: 'https://api.bitget.com/api/v2/mix/market/contracts'
+    contractRestUrl: process.env.BITGET_CONTRACT_REST_URL || 'https://api.bitget.com/api/v2/mix/market/contracts'
   },
   
   // Discord Webhook
   discord: {
-    webhookUrl: process.env.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1401056427753214093/VkCT9tZKFDcRjjBbsaze7bcIbgDOFFAb4qGx17fXq07S9gwkLPYSTU8xW7YOT8koBa9N'
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+    positionWebhookUrl: process.env.DISCORD_POSITION_WEBHOOK_URL,
+    // Discord 圖示配置
+    icons: {
+      chart: process.env.DISCORD_CHART_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png',
+      money: process.env.DISCORD_MONEY_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4b0.png',
+      clock: process.env.DISCORD_CLOCK_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/23f0.png',
+      settings: process.env.DISCORD_SETTINGS_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
+    }
   },
   
   // 監控閾值

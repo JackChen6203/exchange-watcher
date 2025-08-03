@@ -2,6 +2,7 @@ const axios = require('axios');
 
 class DiscordService {
   constructor(config) {
+    this.config = config;
     this.webhookUrl = config.discord.webhookUrl;
     this.rateLimitDelay = 1000; // 1秒間隔避免頻率限制
     this.lastSentTime = 0;
@@ -14,7 +15,7 @@ class DiscordService {
       const payload = {
         content: content,
         username: '交易所監控機器人',
-        avatar_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png'
+        avatar_url: this.config.discord.icons.chart
       };
 
       const response = await axios.post(this.webhookUrl, payload, {
@@ -39,7 +40,7 @@ class DiscordService {
       const payload = {
         embeds: [embed],
         username: '交易所監控機器人',
-        avatar_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png'
+        avatar_url: this.config.discord.icons.chart
       };
 
       const response = await axios.post(this.webhookUrl, payload, {
@@ -104,12 +105,12 @@ class DiscordService {
         }
       ],
       thumbnail: {
-        url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png'
+        url: this.config.discord.icons.chart
       },
       timestamp: new Date().toISOString(),
       footer: {
         text: '交易所監控系統',
-        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
+        icon_url: this.config.discord.icons.settings
       }
     };
   }
@@ -156,12 +157,12 @@ class DiscordService {
         }
       ],
       thumbnail: {
-        url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4b0.png'
+        url: this.config.discord.icons.money
       },
       timestamp: new Date().toISOString(),
       footer: {
         text: '交易所監控系統',
-        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
+        icon_url: this.config.discord.icons.settings
       }
     };
   }
@@ -203,7 +204,7 @@ class DiscordService {
       timestamp: new Date().toISOString(),
       footer: {
         text: '交易所監控系統',
-        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
+        icon_url: this.config.discord.icons.settings
       }
     };
   }

@@ -88,7 +88,7 @@ async function testSystem() {
       timestamp: new Date().toISOString(),
       footer: {
         text: 'Bitget 合約監控系統',
-        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png'
+        icon_url: config.discord.icons.chart
       }
     };
     

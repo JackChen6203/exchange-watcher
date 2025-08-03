@@ -413,7 +413,7 @@ class BitgetMonitor {
       timestamp: new Date().toISOString(),
       footer: {
         text: 'Bitget 現貨監控',
-        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png'
+        icon_url: this.config.discord.icons.chart
       }
     };
 
