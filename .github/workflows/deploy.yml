@@ -1,0 +1,118 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [ main, fix-errors ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test --if-present
+    
+    - name: Lint code
+      run: npm run lint --if-present
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      run: |
+        docker build -t crypto-exchange-monitor:${{ github.sha }} .
+        docker tag crypto-exchange-monitor:${{ github.sha }} crypto-exchange-monitor:latest
+    
+    - name: Save Docker image
+      run: |
+        docker save crypto-exchange-monitor:latest | gzip > crypto-exchange-monitor.tar.gz
+    
+    - name: Upload Docker image artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-image
+        path: crypto-exchange-monitor.tar.gz
+
+  deploy:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix-errors'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download Docker image artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: docker-image
+    
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Copy files to GCP
+      run: |
+        scp crypto-exchange-monitor.tar.gz ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        scp deploy/deploy.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        scp deploy/docker-compose.yml ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+    
+    - name: Deploy to GCP
+      run: |
+        ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          # Load new Docker image
+          gunzip -c crypto-exchange-monitor.tar.gz | docker load
+          
+          # Run deployment script
+          chmod +x deploy.sh
+          ./deploy.sh
+          
+          # Clean up
+          rm crypto-exchange-monitor.tar.gz deploy.sh
+        EOF
+    
+    - name: Health Check
+      run: |
+        sleep 30
+        ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          # Check if containers are running
+          docker ps | grep crypto-exchange-monitor || exit 1
+          
+          # Check logs for any immediate errors
+          docker logs crypto-exchange-monitor --tail 50
+        EOF
+    
+    - name: Notify Success
+      if: success()
+      run: |
+        echo "✅ Deployment to GCP successful!"
+        echo "Commit: ${{ github.sha }}"
+        echo "Branch: ${{ github.ref_name }}"
+    
+    - name: Notify Failure
+      if: failure()
+      run: |
+        echo "❌ Deployment to GCP failed!"
+        echo "Please check the logs above for details."

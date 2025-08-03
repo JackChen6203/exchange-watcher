@@ -1,0 +1,97 @@
+# IDE 和編輯器
+.vscode/
+.history/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.code-workspace
+
+# 臨時文件
+*.tmp
+*.bak
+*.swp
+*.DS_Store
+
+# 日誌文件
+*.log
+logs/
+data/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.eslintcache
+
+# 環境變數
+.env
+.env.local
+.env.production
+.env.development
+
+# 數據庫文件
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# 構建輸出
+dist/
+build/
+coverage/
+
+# 系統文件
+Thumbs.db
+.DS_Store
+
+# 測試
+.nyc_output
+
+# 運行時
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 可選的 npm 快取目錄
+.npm
+
+# 可選的 REPL 歷史
+.node_repl_history
+
+# 輸出的日誌
+yarn-debug.log*
+yarn-error.log*
+
+# 運行時數據
+*.tgz
+
+# 依賴目錄
+jspm_packages/
+
+# 編譯的二進制插件
+build/Release
+
+# TypeScript 緩存
+*.tsbuildinfo
+
+# 可選的 npm 快取目錄
+.npm
+
+# 可選的 REPL 歷史
+.node_repl_history
+
+# 輸出的日誌
+yarn-debug.log*
+yarn-error.log*
+
+# Redis 數據
+dump.rdb
+
+# PM2 日誌
+pm2.log
