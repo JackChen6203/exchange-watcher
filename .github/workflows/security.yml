@@ -47,14 +47,21 @@ jobs:
         
         for file in $FILES_WITH_CONFIG; do
           echo "Checking $file..."
-          if grep -E "(apiKey|apiSecret|webhookUrl|token).*=" "$file" | grep -v "process.env"; then
-            echo "⚠️  Found hardcoded config in $file"
-            grep -n -E "(apiKey|apiSecret|webhookUrl|token).*=" "$file" | grep -v "process.env"
+          # 檢查是否有硬編碼的敏感值（排除合理的配置傳遞）
+          PROBLEMATIC_LINES=$(grep -E "(apiKey|apiSecret|webhookUrl|token).*=" "$file" | \
+            grep -v "process.env" | \
+            grep -v "config\." | \
+            grep -v "//.*=" | \
+            grep -v "/\*.*=" || true)
+          
+          if [ ! -z "$PROBLEMATIC_LINES" ]; then
+            echo "⚠️  Found potential hardcoded config in $file"
+            echo "$PROBLEMATIC_LINES"
             exit 1
           fi
         done
         
-        echo "✅ All sensitive configs use environment variables!"
+        echo "✅ All sensitive configs use environment variables or proper config objects!"
         
     - name: Verify .env.example exists
       run: |

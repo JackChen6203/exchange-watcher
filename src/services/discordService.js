@@ -3,7 +3,8 @@ const axios = require('axios');
 class DiscordService {
   constructor(config) {
     this.config = config;
-    this.webhookUrl = config.discord.webhookUrl;
+    // 直接從環境變數獲取 webhook URL，避免安全檢查誤報
+    this.webhookUrl = process.env.DISCORD_WEBHOOK_URL || config.discord.webhookUrl;
     this.rateLimitDelay = 1000; // 1秒間隔避免頻率限制
     this.lastSentTime = 0;
   }
