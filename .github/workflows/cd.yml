@@ -150,6 +150,11 @@ jobs:
           echo '檢查服務狀態...'
           sudo systemctl status crypto-monitor --no-pager
           
+          # 運行部署後驗證腳本
+          echo '執行部署後驗證...'
+          chmod +x scripts/post-deploy-verify.sh
+          ./scripts/post-deploy-verify.sh
+          
           # 顯示最近的日誌
           echo '最近日誌:'
           sudo journalctl -u crypto-monitor --lines=10 --no-pager

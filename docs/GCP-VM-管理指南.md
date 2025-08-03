@@ -92,6 +92,34 @@ ls -la logs/
 2. 手動測試運行：`cd /home/JackChen6203/crypto-exchange-monitor && node src/index.js`
 3. 檢查文件權限：`ls -la /home/JackChen6203/crypto-exchange-monitor/`
 
+## 設置自動健康檢查
+
+為了確保服務長期穩定運行，建議設置自動健康檢查：
+
+### 1. 設置 Cron Job
+```bash
+# 編輯 crontab
+crontab -e
+
+# 添加以下行（每5分鐘檢查一次）
+*/5 * * * * /home/JackChen6203/crypto-exchange-monitor/scripts/health-check.sh
+
+# 或者每10分鐘檢查一次
+*/10 * * * * /home/JackChen6203/crypto-exchange-monitor/scripts/health-check.sh
+```
+
+### 2. 手動執行健康檢查
+```bash
+cd /home/JackChen6203/crypto-exchange-monitor
+chmod +x scripts/health-check.sh
+./scripts/health-check.sh
+```
+
+### 3. 查看健康檢查日誌
+```bash
+tail -f /home/JackChen6203/crypto-exchange-monitor/logs/health-check.log
+```
+
 ## 快速狀態檢查腳本
 ```bash
 #!/bin/bash

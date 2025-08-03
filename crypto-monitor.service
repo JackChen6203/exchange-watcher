@@ -1,18 +1,34 @@
 [Unit]
-Description=Crypto Exchange Monitor
-After=network.target
+Description=Crypto Exchange Monitor - 加密貨幣交易所監控系統
+After=network.target network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=JackChen6203
+Group=JackChen6203
 WorkingDirectory=/home/JackChen6203/crypto-exchange-monitor
 Environment=NODE_ENV=production
 Environment=PATH=/usr/bin:/usr/local/bin
+EnvironmentFile=-/home/JackChen6203/crypto-exchange-monitor/.env
 ExecStart=/usr/bin/node src/index.js
 Restart=always
 RestartSec=10
+StartLimitInterval=0
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# 日誌設定
 StandardOutput=append:/home/JackChen6203/crypto-exchange-monitor/logs/service.log
 StandardError=append:/home/JackChen6203/crypto-exchange-monitor/logs/error.log
+
+# 安全設定
+NoNewPrivileges=true
+PrivateTmp=true
+
+# 進程管理
+KillMode=mixed
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=multi-user.target
