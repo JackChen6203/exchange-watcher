@@ -1,10 +1,10 @@
-name: CI Pipeline
+name: 持續整合
 
 on:
   push:
-    branches: [ main, master, fix-errors ]
+    branches: [ main ]  # 簡化為只監聽 main 分支
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
   test:

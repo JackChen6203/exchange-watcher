@@ -1,10 +1,10 @@
-name: Security & Environment Check
+name: 安全與環境檢查
 
 on:
   push:
-    branches: [ main, master, fix-errors ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
   env-security-check:

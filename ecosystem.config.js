@@ -1,3 +1,6 @@
+// ⚠️ 此文件已廢棄 - 專案已改用 systemd 進行部署
+// 保留此文件僅供參考，請使用 crypto-monitor.service 進行部署
+
 module.exports = {
   apps: [{
     name: 'crypto-monitor',

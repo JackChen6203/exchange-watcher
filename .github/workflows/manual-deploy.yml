@@ -1,7 +1,9 @@
-name: Manual Deploy
+name: Manual Deploy (PM2) - DISABLED
 
 on:
-  workflow_dispatch:
+  # 暫時禁用此工作流程，改用 systemd 部署 (cd.yml)
+  # workflow_dispatch:
+  manual_trigger: # 禁用自動觸發
     inputs:
       environment:
         description: 'Deployment environment'
