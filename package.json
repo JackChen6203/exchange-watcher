@@ -40,7 +40,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JackChen6203/crypto-exchange-monitor.git"
+    "url": "https://github.com/JackChen6203/exchange-watcher.git"
   },
   "engines": {
     "node": ">=18.0.0"
