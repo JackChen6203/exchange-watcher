@@ -1,0 +1,18 @@
+[Unit]
+Description=Crypto Exchange Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=JackChen6203
+WorkingDirectory=/home/JackChen6203/crypto-exchange-monitor
+Environment=NODE_ENV=production
+Environment=PATH=/usr/bin:/usr/local/bin
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/JackChen6203/crypto-exchange-monitor/logs/service.log
+StandardError=append:/home/JackChen6203/crypto-exchange-monitor/logs/error.log
+
+[Install]
+WantedBy=multi-user.target

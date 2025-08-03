@@ -64,6 +64,7 @@ jobs:
         # 複製配置文件（如果存在）
         [ -f ecosystem.config.js ] && cp ecosystem.config.js deploy/ && echo "✅ PM2 config copied"
         [ -f .env.template ] && cp .env.template deploy/ && echo "✅ Env template copied"
+        [ -f crypto-monitor.service ] && cp crypto-monitor.service deploy/ && echo "✅ Systemd service file copied"
         
         echo "📦 Deployment package ready!"
         
@@ -100,24 +101,59 @@ jobs:
         # 測試 SSH 連接
         ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${GCP_USER}@${GCP_HOST} "echo 'SSH connection successful!'"
         
-        # 停止現有服務
+        # 準備部署目錄並停止現有服務
         ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${GCP_USER}@${GCP_HOST} "
-          cd /home/${GCP_USER}/crypto-exchange-monitor || mkdir -p /home/${GCP_USER}/crypto-exchange-monitor
-          pm2 stop crypto-monitor || echo 'No existing service to stop'
+          # 創建目錄
+          mkdir -p /home/${GCP_USER}/crypto-exchange-monitor
+          mkdir -p /home/${GCP_USER}/crypto-exchange-monitor/logs
+          cd /home/${GCP_USER}/crypto-exchange-monitor
+          
+          # 停止現有服務
+          echo '停止現有服務...'
+          sudo systemctl stop crypto-monitor 2>/dev/null || echo 'No existing service to stop'
         "
         
         # 同步文件
         echo "📁 Syncing files..."
         rsync -avz --delete -e 'ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no' ./deploy/ ${GCP_USER}@${GCP_HOST}:/home/${GCP_USER}/crypto-exchange-monitor/
         
-        # 啟動服務
+        # 安裝依賴並啟動服務
         echo "🔄 Starting service..."
         ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${GCP_USER}@${GCP_HOST} "
           cd /home/${GCP_USER}/crypto-exchange-monitor
+          
+          # 安裝依賴
+          echo '安裝依賴...'
           npm install --only=production
-          pm2 start src/index.js --name crypto-monitor || pm2 restart crypto-monitor
-          pm2 save
-          pm2 status
+          
+          # 創建 .env 文件（如果不存在）
+          if [ ! -f .env ]; then
+            echo '創建 .env 文件...'
+            cp .env.template .env 2>/dev/null || echo 'NODE_ENV=production' > .env
+          fi
+          
+          # 設置 systemd 服務
+          echo '設置 systemd 服務...'
+          if [ -f crypto-monitor.service ]; then
+            sudo cp crypto-monitor.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable crypto-monitor
+          fi
+          
+          # 啟動服務
+          echo '啟動服務...'
+          sudo systemctl start crypto-monitor
+          
+          # 等待服務啟動
+          sleep 5
+          
+          # 檢查服務狀態
+          echo '檢查服務狀態...'
+          sudo systemctl status crypto-monitor --no-pager
+          
+          # 顯示最近的日誌
+          echo '最近日誌:'
+          sudo journalctl -u crypto-monitor --lines=10 --no-pager
         "
         
         echo "🎉 Deployment successful!"
