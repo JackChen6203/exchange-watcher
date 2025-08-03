@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   release:
     types: [ published ]
+  workflow_dispatch:
 
 jobs:
   deploy-to-gcp:
@@ -27,52 +28,99 @@ jobs:
       
     - name: Create deployment package
       run: |
+        echo "🚀 Creating deployment package..."
         mkdir -p deploy
-        cp -r src deploy/
-        # 創建 data 目錄（如果不存在）
+        
+        # 複製源代碼
+        if [ -d "src" ]; then
+          cp -r src deploy/
+          echo "✅ Source code copied"
+        else
+          echo "❌ No src directory found"
+          exit 1
+        fi
+        
+        # 創建並複製 data 目錄
         mkdir -p data
+        if [ ! -f "data/README.md" ]; then
+          echo "# Data Directory" > data/README.md
+          echo "This directory contains application data files." >> data/README.md
+        fi
         cp -r data deploy/
+        echo "✅ Data directory copied"
+        
+        # 複製 package 文件
         cp package*.json deploy/
+        echo "✅ Package files copied"
+        
+        # 複製 node_modules
         cp -r node_modules deploy/
+        echo "✅ Dependencies copied"
+        
         # 創建 logs 目錄
         mkdir -p deploy/logs
-        # 複製配置文件
-        if [ -f ecosystem.config.js ]; then cp ecosystem.config.js deploy/; fi
-        if [ -f .env.template ]; then cp .env.template deploy/; fi
+        echo "✅ Logs directory created"
         
-    - name: Setup SSH key and config
+        # 複製配置文件（如果存在）
+        [ -f ecosystem.config.js ] && cp ecosystem.config.js deploy/ && echo "✅ PM2 config copied"
+        [ -f .env.template ] && cp .env.template deploy/ && echo "✅ Env template copied"
+        
+        echo "📦 Deployment package ready!"
+        
+    - name: Setup SSH connection
       run: |
+        echo "🔑 Setting up SSH connection..."
+        
+        # 檢查必要的 secrets
+        if [ -z "${{ secrets.GCP_SSH_PRIVATE_KEY }}" ]; then
+          echo "❌ GCP_SSH_PRIVATE_KEY secret not configured"
+          exit 1
+        fi
+        
+        # 創建 SSH 目錄和密鑰文件
         mkdir -p ~/.ssh
-        echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519_new
-        chmod 600 ~/.ssh/id_ed25519_new
+        chmod 700 ~/.ssh
         
-        # 創建 SSH 配置文件
-        cat >> ~/.ssh/config << EOF
-        Host gcp_deployment
-          HostName ${{ secrets.GCP_HOST || '35.212.185.14' }}
-          User ${{ secrets.GCP_USER || 'JackChen6203' }}
-          IdentityFile ~/.ssh/id_ed25519_new
-          StrictHostKeyChecking no
-        EOF
+        # 將私鑰寫入文件
+        echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
         
-        # 添加主機密鑰
+        # 添加服務器到 known_hosts
         ssh-keyscan -H ${{ secrets.GCP_HOST || '35.212.185.14' }} >> ~/.ssh/known_hosts
+        
+        echo "✅ SSH setup completed"
         
     - name: Deploy to GCP
       run: |
-        ssh gcp_deployment "
-          cd /home/${{ secrets.GCP_USER || 'JackChen6203' }}/crypto-exchange-monitor || mkdir -p /home/${{ secrets.GCP_USER || 'JackChen6203' }}/crypto-exchange-monitor
-          pm2 stop crypto-monitor || true
+        echo "🚀 Deploying to GCP..."
+        
+        GCP_HOST="${{ secrets.GCP_HOST || '35.212.185.14' }}"
+        GCP_USER="${{ secrets.GCP_USER || 'JackChen6203' }}"
+        
+        # 測試 SSH 連接
+        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${GCP_USER}@${GCP_HOST} "echo 'SSH connection successful!'"
+        
+        # 停止現有服務
+        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${GCP_USER}@${GCP_HOST} "
+          cd /home/${GCP_USER}/crypto-exchange-monitor || mkdir -p /home/${GCP_USER}/crypto-exchange-monitor
+          pm2 stop crypto-monitor || echo 'No existing service to stop'
         "
         
-        rsync -avz --delete ./deploy/ gcp_deployment:/home/${{ secrets.GCP_USER || 'JackChen6203' }}/crypto-exchange-monitor/
+        # 同步文件
+        echo "📁 Syncing files..."
+        rsync -avz --delete -e 'ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no' ./deploy/ ${GCP_USER}@${GCP_HOST}:/home/${GCP_USER}/crypto-exchange-monitor/
         
-        ssh gcp_deployment "
-          cd /home/${{ secrets.GCP_USER || 'JackChen6203' }}/crypto-exchange-monitor
+        # 啟動服務
+        echo "🔄 Starting service..."
+        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${GCP_USER}@${GCP_HOST} "
+          cd /home/${GCP_USER}/crypto-exchange-monitor
           npm install --only=production
           pm2 start src/index.js --name crypto-monitor || pm2 restart crypto-monitor
           pm2 save
+          pm2 status
         "
+        
+        echo "🎉 Deployment successful!"
 
   test:
     runs-on: ubuntu-latest
