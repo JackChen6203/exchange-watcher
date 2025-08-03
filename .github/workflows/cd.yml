@@ -29,9 +29,16 @@ jobs:
       run: |
         mkdir -p deploy
         cp -r src deploy/
+        # 創建 data 目錄（如果不存在）
+        mkdir -p data
         cp -r data deploy/
         cp package*.json deploy/
         cp -r node_modules deploy/
+        # 創建 logs 目錄
+        mkdir -p deploy/logs
+        # 複製配置文件
+        if [ -f ecosystem.config.js ]; then cp ecosystem.config.js deploy/; fi
+        if [ -f .env.template ]; then cp .env.template deploy/; fi
         
     - name: Setup SSH key
       uses: webfactory/ssh-agent@v0.7.0

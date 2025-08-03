@@ -71,17 +71,17 @@ jobs:
         mkdir -p ~/.ssh
         echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+        ssh-keyscan -H ${{ secrets.GCP_HOST || '35.212.185.14' }} >> ~/.ssh/known_hosts
     
     - name: Copy files to GCP
       run: |
-        scp crypto-exchange-monitor.tar.gz ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
-        scp deploy/deploy.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
-        scp deploy/docker-compose.yml ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        scp crypto-exchange-monitor.tar.gz ${{ secrets.GCP_USER || 'JackChen6203' }}@${{ secrets.GCP_HOST || '35.212.185.14' }}:~/
+        scp deploy/deploy.sh ${{ secrets.GCP_USER || 'JackChen6203' }}@${{ secrets.GCP_HOST || '35.212.185.14' }}:~/
+        scp deploy/docker-compose.yml ${{ secrets.GCP_USER || 'JackChen6203' }}@${{ secrets.GCP_HOST || '35.212.185.14' }}:~/
     
     - name: Deploy to GCP
       run: |
-        ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+        ssh ${{ secrets.GCP_USER || 'JackChen6203' }}@${{ secrets.GCP_HOST || '35.212.185.14' }} << 'EOF'
           # Load new Docker image
           gunzip -c crypto-exchange-monitor.tar.gz | docker load
           
