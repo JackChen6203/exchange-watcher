@@ -82,16 +82,16 @@ jobs:
       run: |
         sleep 30
         ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
-          # 檢查 PM2 狀態
-          if pm2 list | grep -q "crypto-monitor.*online"; then
+          # 檢查 systemd 服務狀態
+          if sudo systemctl is-active --quiet crypto-monitor; then
             echo "✅ 應用程式運行正常"
-            pm2 list
+            sudo systemctl status crypto-monitor --no-pager -l
             echo "--- 最近日誌 ---"
-            pm2 logs crypto-monitor --lines 20 --nostream
+            sudo journalctl -u crypto-monitor -n 20 --no-pager
           else
             echo "❌ 應用程式運行異常"
-            pm2 list
-            pm2 logs crypto-monitor --lines 50 --nostream
+            sudo systemctl status crypto-monitor --no-pager -l
+            sudo journalctl -u crypto-monitor -n 50 --no-pager
             exit 1
           fi
         EOF
@@ -103,10 +103,11 @@ jobs:
         echo ""
         echo "📋 管理命令："
         echo "ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
-        echo "pm2 list              # 查看服務狀態"
-        echo "pm2 logs crypto-monitor -f  # 查看即時日誌"
-        echo "pm2 restart crypto-monitor   # 重啟服務"
-        echo "pm2 monit            # 監控介面"
+        echo "sudo systemctl status crypto-monitor    # 查看服務狀態"
+        echo "sudo journalctl -u crypto-monitor -f    # 查看即時日誌"
+        echo "sudo systemctl restart crypto-monitor   # 重啟服務"
+        echo "sudo systemctl stop crypto-monitor      # 停止服務"
+        echo "sudo systemctl start crypto-monitor     # 啟動服務"
         echo ""
         echo "📁 重要路徑："
         echo "/home/${{ secrets.GCP_USER }}/crypto-exchange-monitor/.env  # 配置檔案"

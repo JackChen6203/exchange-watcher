@@ -1,44 +1,56 @@
 # 🚀 加密貨幣交易所監控系統
 
-一個功能強大的加密貨幣交易所持倉和價格監控系統，支持實時監控並透過Discord Webhook發送警報。
+一個強大的 Bitget 交易所監控系統，支援持倉量監控、資金費率監控和實時 Discord 通知。
 
-## ✨ 功能特色
+## ✨ 核心功能
 
-- 📊 **實時價格監控** - 監控指定交易對的價格變化
-- 💰 **持倉變動監控** - 追蹤交易所持倉的實時變化
-- 🔔 **Discord 通知** - 透過Discord Webhook發送美觀的嵌入式警報消息
-- 🔄 **自動重連** - WebSocket連接異常時自動重新連接
-- ⚙️ **靈活配置** - 支持自定義監控閾值和交易對
-- 🛡️ **錯誤處理** - 完善的錯誤處理和日誌記錄
+- � **合約持倉量監控** - 實時監控開倉量變化並生成排行榜
+- 💰 **資金費率監控** - 跟蹤資金費率異動並發出警報
+- 📊 **定時報告** - 每 15 分鐘自動生成排行榜報告
+- 🔔 **Discord 通知** - 透過 Webhook 發送精美的監控結果
+- 💾 **數據持久化** - SQLite 數據庫存儲歷史數據
+- 🔄 **自動重連** - WebSocket 連接異常時自動重新連接
+- � **完整日誌** - 詳細的日誌記錄系統
 
-## 🛠️ 安裝步驟
+## 🛠️ 快速開始
 
-1. **克隆專案**
-   ```bash
-   git clone <repository-url>
-   cd crypto-exchange-monitor
-   ```
+### 1. 安裝依賴
+```bash
+git clone https://github.com/JackChen6203/exchange-watcher.git
+cd exchange-watcher
+npm install
+```
 
-2. **安裝依賴**
-   ```bash
-   npm install
-   ```
+### 2. 配置環境變數
+```bash
+cp .env.example .env
+nano .env
+```
+### 3. 測試系統
+```bash
+# 運行測試
+npm test
 
-3. **配置環境變數**
-   ```bash
-   cp .env.example .env
-   # 編輯 .env 文件，填入你的API密鑰和配置
-   ```
+# 測試 Discord 通知
+npm run test-discord
+```
 
-## ⚙️ 配置說明
+### 4. 啟動監控
+```bash
+# 本地運行
+npm start
 
-### 環境變數 (.env)
+# 開發模式（自動重啟）
+npm run dev
+```
+
+## ⚙️ 環境變數配置
 
 ```env
-# 交易所 API 配置
-API_KEY=your_api_key_here
-API_SECRET=your_api_secret_here
-API_PASSPHRASE=your_passphrase_here
+# Bitget API 配置
+API_KEY=your_bitget_api_key
+API_SECRET=your_bitget_api_secret
+API_PASSPHRASE=your_bitget_passphrase
 
 # Discord Webhook URLs
 DISCORD_WEBHOOK_URL=your_discord_webhook_url
@@ -46,56 +58,140 @@ FUNDING_RATE_WEBHOOK_URL=your_funding_rate_webhook_url
 POSITION_WEBHOOK_URL=your_position_webhook_url
 
 # 監控閾值
-PRICE_CHANGE_THRESHOLD=5      # 價格變動百分比閾值
-POSITION_CHANGE_THRESHOLD=1000 # 持倉變動金額閾值
-UPDATE_INTERVAL=5000          # 更新間隔(毫秒)
+PRICE_CHANGE_THRESHOLD=10
+POSITION_CHANGE_THRESHOLD=10
+FUNDING_RATE_HIGH_THRESHOLD=0.1
+FUNDING_RATE_LOW_THRESHOLD=-0.1
+
+# 日誌配置
+LOG_LEVEL=info
+VERBOSE_LOGGING=false
 ```
 
-### 監控配置
+## � 部署
 
-在 `src/config/config.js` 中可以修改：
-- 監控的交易對列表
-- 連接的交易所API端點
-- 其他系統參數
-
-## 🚦 使用方法
-
-### 啟動監控系統
+### 自動部署（推薦）
+推送到 main 分支會自動部署到 GCP VM：
 ```bash
-npm start
+git push origin main
 ```
 
-### 開發模式 (自動重啟)
+### 手動部署
+1. 準備伺服器環境：
 ```bash
-npm run dev
+# 初始化 VM
+bash deploy/vm-setup.sh
 ```
 
-### 發送測試消息
+2. 執行部署：
 ```bash
-npm start -- --test
+# 複製檔案並部署
+bash deploy/direct-deploy.sh
 ```
 
-### 運行測試
+詳細部署說明請參閱 [DEPLOYMENT.md](DEPLOYMENT.md)
+
+## 📊 監控報告
+
+系統每 15 分鐘自動發送以下報告到 Discord：
+
+### 持倉量變動排行榜
+- 📈 **正異動 TOP 15** - 持倉量增加最多的合約
+- 📉 **負異動 TOP 15** - 持倉量減少最多的合約
+
+### 資金費率排行榜  
+- 🟢 **正費率 TOP 15** - 資金費率最高的合約
+- 🔴 **負費率 TOP 15** - 資金費率最低的合約
+
+## 📋 系統架構
+
+```
+src/
+├── config/config.js          # 系統配置
+├── services/
+│   ├── bitgetApi.js          # Bitget API 接口
+│   ├── contractMonitor.js    # 合約監控（持倉量+資金費率）
+│   ├── databaseManager.js    # 數據庫管理
+│   └── discordService.js     # Discord 通知服務
+├── utils/
+│   └── logger.js             # 日誌工具
+└── index.js                  # 主程序入口
+```
+
+## 🔧 管理命令
+
+### 本地開發
 ```bash
-# 測試Discord webhook
-npm test -- --discord
-
-# 測試配置
-npm test -- --config
+npm start          # 啟動監控
+npm run dev        # 開發模式
+npm test           # 運行測試
+npm run system-test # 系統測試
 ```
 
-## 📋 支持的監控項目
+### 生產環境（systemd）
+```bash
+sudo systemctl status crypto-monitor    # 查看狀態
+sudo systemctl restart crypto-monitor   # 重啟服務
+sudo journalctl -u crypto-monitor -f    # 查看日誌
+```
 
-### 💰 持倉監控
-- 持倉數量變化
-- 平均成本價格
-- 未實現盈虧變化
-- 持倉總價值
+## 💾 數據存儲
 
-### 📈 價格監控  
-- 實時價格變化
-- 24小時漲跌幅
-- 成交量信息
+### SQLite 數據庫
+- `open_interest` - 持倉量歷史數據
+- `funding_rate` - 資金費率歷史數據  
+- `price_data` - 價格變動數據
+- `ranking_snapshots` - 排行榜快照
+
+### 數據清理
+- 自動保留最近 30 天的數據
+- 內存中保留最近 100 條記錄
+- 定期清理過期數據
+
+## � 故障排除
+
+### 常見問題
+
+**API 連接失敗**
+- 檢查 API 密鑰是否正確
+- 確認 API 權限設置
+- 檢查網絡連接
+
+**Discord 通知失敗**
+- 驗證 Webhook URL 是否有效
+- 檢查 Discord 服務器權限
+
+**服務無法啟動**
+```bash
+# 檢查服務狀態
+sudo systemctl status crypto-monitor
+
+# 查看詳細日誌
+sudo journalctl -u crypto-monitor -n 50
+
+# 檢查配置文件
+nano ~/.crypto-exchange-monitor/.env
+```
+
+## 📚 相關文檔
+
+- [📖 設置指南](SETUP.md) - 詳細的安裝和配置說明
+- [� 部署指南](DEPLOYMENT.md) - 生產環境部署
+- [🔒 安全指南](SECURITY.md) - 安全設置最佳實踐
+- [📊 Bitget 監控](README-BITGET.md) - Bitget 特定功能
+- [⚙️ 合約監控](README-CONTRACT-MONITOR.md) - 合約監控詳細說明
+
+## 🤝 貢獻
+
+歡迎提交 Issues 和 Pull Requests！
+
+## 📄 授權
+
+MIT License
+
+## ⚠️ 免責聲明
+
+本系統僅用於監控目的，不執行任何交易操作。請確保 API 權限設置正確，避免意外風險。
 - 價格趨勢方向
 
 ## 🔔 Discord 通知類型

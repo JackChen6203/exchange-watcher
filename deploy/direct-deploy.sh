@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 直接部署腳本 - 不使用 Docker
-# 專門為單一用途 VM 設計
+# 直接部署腳本 - 使用 systemd 服務管理
+# 專門為單一用途 VM 設計，不使用 PM2
 
 set -e
 
@@ -23,8 +23,9 @@ APP_DIR="/home/$USER/crypto-exchange-monitor"
 SERVICE_NAME="crypto-monitor"
 LOG_DIR="/home/$USER/logs"
 DATA_DIR="/home/$USER/data"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
-log_info "🚀 開始直接部署 $APP_NAME"
+log_info "🚀 開始直接部署 $APP_NAME (使用 systemd)"
 
 # 檢查並安裝 Node.js
 check_nodejs() {
@@ -47,22 +48,22 @@ check_nodejs() {
     fi
 }
 
-# 檢查並安裝 PM2
-check_pm2() {
-    if ! command -v pm2 &> /dev/null; then
-        log_warning "PM2 未安裝，正在安裝..."
-        sudo npm install -g pm2
-        log_success "PM2 安裝完成"
-    else
-        log_success "PM2 已安裝: $(pm2 --version)"
-    fi
-}
-
 # 創建必要目錄
 create_directories() {
     log_info "📁 創建必要目錄"
     mkdir -p "$APP_DIR" "$LOG_DIR" "$DATA_DIR"
     log_success "目錄創建完成"
+}
+
+# 停止現有服務
+stop_service() {
+    log_info "🛑 停止現有服務"
+    if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
+        sudo systemctl stop "$SERVICE_NAME"
+        log_success "服務已停止"
+    else
+        log_info "服務未運行"
+    fi
 }
 
 # 部署應用程式
@@ -93,6 +94,9 @@ deploy_app() {
     log_info "📥 安裝依賴"
     npm ci --production
     
+    # 設定目錄權限
+    chown -R $USER:$USER "$APP_DIR"
+    
     log_success "應用程式部署完成"
 }
 
@@ -112,32 +116,46 @@ setup_environment() {
     fi
 }
 
-# 配置 PM2
-setup_pm2() {
-    log_info "🔧 配置 PM2"
+# 創建 systemd 服務
+create_systemd_service() {
+    log_info "🔧 創建 systemd 服務"
     
-    cd "$APP_DIR"
+    sudo tee "$SERVICE_FILE" > /dev/null << EOF
+[Unit]
+Description=Crypto Exchange Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$APP_DIR
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+StandardOutput=append:$LOG_DIR/app.log
+StandardError=append:$LOG_DIR/error.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
     
-    # 停止現有進程
-    pm2 stop "$SERVICE_NAME" 2>/dev/null || true
-    pm2 delete "$SERVICE_NAME" 2>/dev/null || true
+    # 重新載入 systemd
+    sudo systemctl daemon-reload
     
-    # 啟動增強版本
-    pm2 start src/enhancedIndex.js --name "$SERVICE_NAME" \
-        --log "$LOG_DIR/app.log" \
-        --error "$LOG_DIR/error.log" \
-        --out "$LOG_DIR/output.log" \
-        --time \
-        --max-memory-restart 1G \
-        --restart-delay 10000
+    # 啟用服務（開機自啟）
+    sudo systemctl enable "$SERVICE_NAME"
     
-    # 保存 PM2 配置
-    pm2 save
+    log_success "systemd 服務創建完成"
+}
+
+# 啟動服務
+start_service() {
+    log_info "🚀 啟動服務"
     
-    # 設置開機自啟
-    pm2 startup | tail -1 | sudo bash || true
+    sudo systemctl start "$SERVICE_NAME"
     
-    log_success "PM2 配置完成"
+    log_success "服務啟動完成"
 }
 
 # 健康檢查
@@ -146,33 +164,34 @@ health_check() {
     
     sleep 10
     
-    if pm2 list | grep -q "$SERVICE_NAME.*online"; then
+    if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
         log_success "✅ 應用程式運行正常"
         
         # 顯示狀態
-        pm2 list
+        sudo systemctl status "$SERVICE_NAME" --no-pager -l
         
         # 顯示最近日誌
         log_info "📋 最近日誌:"
-        pm2 logs "$SERVICE_NAME" --lines 20 --nostream
+        sudo journalctl -u "$SERVICE_NAME" -n 20 --no-pager
         
     else
         log_error "❌ 應用程式啟動失敗"
-        pm2 logs "$SERVICE_NAME" --lines 50 --nostream
+        sudo journalctl -u "$SERVICE_NAME" -n 50 --no-pager
         exit 1
     fi
 }
 
 # 主要執行流程
 main() {
-    log_info "🎯 專用 VM 直接部署模式"
+    log_info "🎯 專用 VM 直接部署模式 (systemd)"
     
     check_nodejs
-    check_pm2
     create_directories
+    stop_service
     deploy_app
     setup_environment
-    setup_pm2
+    create_systemd_service
+    start_service
     health_check
     
     log_success "🎉 部署完成！"
@@ -183,17 +202,17 @@ main() {
     echo "服務名稱: $SERVICE_NAME"
     echo "========================================"
     echo "管理命令："
-    echo "  查看狀態: pm2 list"
-    echo "  查看日誌: pm2 logs $SERVICE_NAME"
-    echo "  重啟服務: pm2 restart $SERVICE_NAME"
-    echo "  停止服務: pm2 stop $SERVICE_NAME"
-    echo "  監控介面: pm2 monit"
+    echo "  查看狀態: sudo systemctl status $SERVICE_NAME"
+    echo "  查看日誌: sudo journalctl -u $SERVICE_NAME -f"
+    echo "  重啟服務: sudo systemctl restart $SERVICE_NAME"
+    echo "  停止服務: sudo systemctl stop $SERVICE_NAME"
+    echo "  啟動服務: sudo systemctl start $SERVICE_NAME"
     echo "========================================"
     
     log_info "💡 提示："
     echo "  1. 請編輯 $APP_DIR/.env 配置檔案"
-    echo "  2. 配置完成後執行: pm2 restart $SERVICE_NAME"
-    echo "  3. 查看即時日誌: pm2 logs $SERVICE_NAME -f"
+    echo "  2. 配置完成後執行: sudo systemctl restart $SERVICE_NAME"
+    echo "  3. 查看即時日誌: sudo journalctl -u $SERVICE_NAME -f"
 }
 
 # 執行主函數

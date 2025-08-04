@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # VM 初始化腳本 - 專用於加密貨幣監控程式
-# 僅安裝必要的組件：Node.js + PM2
+# 安裝 Node.js 和必要組件，使用 systemd 服務管理
 
 set -e
 
@@ -30,165 +30,80 @@ sudo apt-get install -y \
     curl \
     wget \
     git \
-    unzip \
     htop \
     nano \
-    build-essential
+    unzip \
+    software-properties-common \
+    apt-transport-https \
+    ca-certificates \
+    gnupg \
+    lsb-release
 
 # 安裝 Node.js 18 LTS
 log_info "📦 安裝 Node.js 18 LTS"
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# 驗證 Node.js 安裝
-log_success "Node.js 版本: $(node --version)"
-log_success "npm 版本: $(npm --version)"
+# 驗證安裝
+log_info "✅ 驗證安裝"
+node_version=$(node --version)
+npm_version=$(npm --version)
 
-# 安裝 PM2
-log_info "🔧 安裝 PM2 進程管理器"
-sudo npm install -g pm2
+log_success "Node.js 版本: $node_version"
+log_success "npm 版本: $npm_version"
 
-# 驗證 PM2 安裝
-log_success "PM2 版本: $(pm2 --version)"
-
-# 創建應用目錄結構
-log_info "📁 創建目錄結構"
+# 創建應用目錄
+log_info "📁 創建應用目錄"
 mkdir -p ~/crypto-exchange-monitor
 mkdir -p ~/logs
 mkdir -p ~/data
-mkdir -p ~/backups
 
-# 設置權限
-chmod 755 ~/crypto-exchange-monitor ~/logs ~/data ~/backups
-
-# 創建基本配置檔案
-log_info "⚙️ 創建基本配置"
-
-# 創建 logrotate 配置
-sudo tee /etc/logrotate.d/crypto-monitor > /dev/null << 'EOF'
-/home/*/logs/*.log {
-    daily
-    missingok
-    rotate 7
-    compress
-    delaycompress
-    copytruncate
-    su root root
-}
-EOF
-
-# 創建監控腳本
-tee ~/monitor.sh > /dev/null << 'EOF'
-#!/bin/bash
-# 簡單的健康監控腳本
-
-SERVICE_NAME="crypto-monitor"
-
-if ! pm2 describe $SERVICE_NAME > /dev/null 2>&1; then
-    echo "$(date): 服務不存在"
-    exit 1
-fi
-
-if pm2 list | grep -q "$SERVICE_NAME.*online"; then
-    echo "$(date): 服務運行正常"
-else
-    echo "$(date): 服務異常，嘗試重啟"
-    pm2 restart $SERVICE_NAME
-    sleep 10
-    
-    if pm2 list | grep -q "$SERVICE_NAME.*online"; then
-        echo "$(date): 重啟成功"
-    else
-        echo "$(date): 重啟失敗，需要人工檢查"
-        exit 1
-    fi
-fi
-EOF
-
-chmod +x ~/monitor.sh
-
-# 創建備份腳本
-tee ~/backup.sh > /dev/null << 'EOF'
-#!/bin/bash
-# 簡單的備份腳本
-
-BACKUP_DIR=~/backups
-DATE=$(date +%Y%m%d_%H%M%S)
-
-# 備份數據
-if [ -d ~/data ]; then
-    tar -czf "$BACKUP_DIR/data_$DATE.tar.gz" -C ~ data/
-    echo "$(date): 數據備份完成 - data_$DATE.tar.gz"
-fi
-
-# 備份日誌（最近3天）
-if [ -d ~/logs ]; then
-    find ~/logs -name "*.log" -mtime -3 | tar -czf "$BACKUP_DIR/logs_$DATE.tar.gz" -T -
-    echo "$(date): 日誌備份完成 - logs_$DATE.tar.gz"
-fi
-
-# 清理舊備份（保持7天）
-find "$BACKUP_DIR" -name "*.tar.gz" -mtime +7 -delete
-echo "$(date): 舊備份清理完成"
-EOF
-
-chmod +x ~/backup.sh
-
-# 設置防火牆（如果需要外部訪問）
-log_info "🔒 配置基本安全"
+# 設置防火牆（如果需要）
+log_info "🔒 設置基本防火牆規則"
 sudo ufw --force enable
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
 sudo ufw allow ssh
-sudo ufw allow from 10.0.0.0/8  # 允許內網訪問
-log_success "防火牆配置完成"
+
+# 設置自動安全更新
+log_info "🔄 啟用自動安全更新"
+sudo apt-get install -y unattended-upgrades
+echo 'Unattended-Upgrade::Automatic-Reboot "false";' | sudo tee -a /etc/apt/apt.conf.d/50unattended-upgrades
 
 # 優化系統設置
 log_info "⚡ 優化系統設置"
 
-# 增加文件描述符限制
-echo "$USER soft nofile 65536" | sudo tee -a /etc/security/limits.conf
-echo "$USER hard nofile 65536" | sudo tee -a /etc/security/limits.conf
+# 設置 swap（如果記憶體不足）
+if [ $(free -m | awk 'NR==2{printf "%.0f", $2}') -lt 2048 ]; then
+    log_info "💾 創建 swap 檔案"
+    sudo fallocate -l 1G /swapfile
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+fi
 
-# 創建系統監控別名
-tee -a ~/.bashrc > /dev/null << 'EOF'
+# 設置時區
+log_info "🕐 設置時區"
+sudo timedatectl set-timezone Asia/Taipei
 
-# 加密貨幣監控相關別名
-alias monitor-status='pm2 list'
-alias monitor-logs='pm2 logs crypto-monitor'
-alias monitor-restart='pm2 restart crypto-monitor'
-alias monitor-stop='pm2 stop crypto-monitor'
-alias monitor-start='pm2 start crypto-monitor'
-alias monitor-health='~/monitor.sh'
-alias monitor-backup='~/backup.sh'
-alias monitor-config='nano ~/crypto-exchange-monitor/.env'
+# 清理
+log_info "🧹 清理暫存檔案"
+sudo apt-get autoremove -y
+sudo apt-get autoclean
 
-# 系統監控
-alias sysinfo='echo "=== CPU ===" && top -bn1 | head -3 && echo "=== Memory ===" && free -h && echo "=== Disk ===" && df -h'
-EOF
+log_success "🎉 VM 環境初始化完成！"
 
-# 顯示完成信息
-log_success "🎉 VM 初始化完成！"
 echo "========================================"
-echo "Node.js: $(node --version)"
-echo "npm: $(npm --version)"  
-echo "PM2: $(pm2 --version)"
+echo "系統資訊："
+echo "  作業系統: $(lsb_release -d | cut -f2)"
+echo "  Node.js: $(node --version)"
+echo "  npm: $(npm --version)"
+echo "  記憶體: $(free -h | awk 'NR==2{print $2}')"
+echo "  磁碟空間: $(df -h / | awk 'NR==2{print $4}') 可用"
 echo "========================================"
-echo "目錄結構："
-echo "  ~/crypto-exchange-monitor/ - 應用程式目錄"
-echo "  ~/logs/                   - 日誌目錄"
-echo "  ~/data/                   - 數據目錄"
-echo "  ~/backups/                - 備份目錄"
+echo "下一步："
+echo "  1. 複製應用程式檔案到 ~/crypto-exchange-monitor/"
+echo "  2. 執行部署腳本: ./direct-deploy.sh"
+echo "  3. 編輯環境變數: nano ~/crypto-exchange-monitor/.env"
 echo "========================================"
-echo "實用腳本："
-echo "  ~/monitor.sh              - 健康檢查"
-echo "  ~/backup.sh               - 數據備份"
-echo "========================================"
-echo "常用命令（重新登錄後可用）："
-echo "  monitor-status            - 查看服務狀態"
-echo "  monitor-logs              - 查看日誌"
-echo "  monitor-restart           - 重啟服務"
-echo "  monitor-config            - 編輯配置"
-echo "  sysinfo                   - 系統信息"
-echo "========================================"
-
-log_warning "⚠️ 請重新登錄以載入新的環境設置"
-log_info "現在可以運行應用程式部署腳本了"
