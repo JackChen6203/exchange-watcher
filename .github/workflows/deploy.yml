@@ -73,6 +73,13 @@ jobs:
           chmod +x ~/direct-deploy.sh
           ~/direct-deploy.sh
           
+          # 修復 Git 權限問題
+          if [ -d "/home/$USER/crypto-exchange-monitor/.git" ]; then
+            sudo chown -R $USER:$USER /home/$USER/crypto-exchange-monitor/
+            cd /home/$USER/crypto-exchange-monitor
+            git config --global --add safe.directory /home/$USER/crypto-exchange-monitor
+          fi
+          
           # 清理
           cd ~
           rm -rf ~/app-temp ~/app.tar.gz ~/direct-deploy.sh

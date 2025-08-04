@@ -70,10 +70,15 @@ stop_service() {
 deploy_app() {
     log_info "📦 部署應用程式"
     
-    # 如果已存在，先備份
+    # 如果已存在，先備份（只保留最近3個備份）
     if [ -d "$APP_DIR" ]; then
         log_info "備份現有版本"
-        sudo mv "$APP_DIR" "${APP_DIR}_backup_$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+        backup_name="${APP_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
+        sudo mv "$APP_DIR" "$backup_name" 2>/dev/null || true
+        
+        # 清理舊備份，只保留最近3個
+        log_info "清理舊備份（保留最近3個）"
+        ls -dt ${APP_DIR}_backup_* 2>/dev/null | tail -n +4 | xargs -r sudo rm -rf
     fi
     
     # 創建應用目錄
