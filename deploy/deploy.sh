@@ -40,8 +40,27 @@ log_info "🚀 開始部署 $APP_NAME"
 
 # 檢查 Docker 是否安裝
 if ! command -v docker &> /dev/null; then
-    log_error "Docker 未安裝，請先安裝 Docker"
-    exit 1
+    log_warning "Docker 未安裝，正在自動安裝..."
+    
+    # 檢查是否有安裝腳本
+    if [ -f "install-docker.sh" ]; then
+        chmod +x install-docker.sh
+        ./install-docker.sh
+    else
+        log_error "Docker 未安裝且找不到安裝腳本，請手動安裝 Docker"
+        log_info "安裝命令："
+        echo "curl -fsSL https://get.docker.com | sh"
+        echo "sudo usermod -aG docker \$USER"
+        exit 1
+    fi
+    
+    # 重新檢查 Docker
+    if ! command -v docker &> /dev/null; then
+        log_error "Docker 安裝失敗，請手動安裝"
+        exit 1
+    fi
+    
+    log_success "Docker 安裝成功"
 fi
 
 # 檢查 Docker Compose 是否安裝

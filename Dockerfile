@@ -27,5 +27,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "console.log('Health check passed')" || exit 1
 
-# 啟動應用程式
-CMD ["npm", "start"]
+# 啟動增強版應用程式
+CMD ["npm", "run", "start:enhanced"]
