@@ -1,0 +1,112 @@
+name: Direct Deploy to GCP VM
+
+on:
+  push:
+    branches: [ main, fix-errors ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm run test:enhanced --if-present
+    
+    - name: Lint code
+      run: npm run lint --if-present
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix-errors'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to GCP VM
+      run: |
+        # 創建部署包
+        tar --exclude='node_modules' --exclude='.git' --exclude='*.tar.gz' -czf app.tar.gz .
+        
+        # 複製到服務器
+        scp app.tar.gz ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        scp deploy/direct-deploy.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        
+        # 執行部署
+        ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          # 解壓縮應用程式
+          rm -rf ~/app-temp
+          mkdir ~/app-temp
+          cd ~/app-temp
+          tar -xzf ~/app.tar.gz
+          
+          # 執行部署腳本
+          chmod +x ~/direct-deploy.sh
+          ~/direct-deploy.sh
+          
+          # 清理
+          cd ~
+          rm -rf ~/app-temp ~/app.tar.gz ~/direct-deploy.sh
+        EOF
+    
+    - name: Health Check
+      run: |
+        sleep 30
+        ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
+          # 檢查 PM2 狀態
+          if pm2 list | grep -q "crypto-monitor.*online"; then
+            echo "✅ 應用程式運行正常"
+            pm2 list
+            echo "--- 最近日誌 ---"
+            pm2 logs crypto-monitor --lines 20 --nostream
+          else
+            echo "❌ 應用程式運行異常"
+            pm2 list
+            pm2 logs crypto-monitor --lines 50 --nostream
+            exit 1
+          fi
+        EOF
+    
+    - name: Show Management Commands
+      if: success()
+      run: |
+        echo "✅ 部署成功！"
+        echo ""
+        echo "📋 管理命令："
+        echo "ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
+        echo "pm2 list              # 查看服務狀態"
+        echo "pm2 logs crypto-monitor -f  # 查看即時日誌"
+        echo "pm2 restart crypto-monitor   # 重啟服務"
+        echo "pm2 monit            # 監控介面"
+        echo ""
+        echo "📁 重要路徑："
+        echo "/home/${{ secrets.GCP_USER }}/crypto-exchange-monitor/.env  # 配置檔案"
+        echo "/home/${{ secrets.GCP_USER }}/logs/                        # 日誌目錄"
+        echo "/home/${{ secrets.GCP_USER }}/data/                        # 數據目錄"
+    
+    - name: Notify Failure
+      if: failure()
+      run: |
+        echo "❌ 直接部署失敗！"
+        echo "請檢查上方日誌或 SSH 到服務器手動檢查："
+        echo "ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"

@@ -18,7 +18,9 @@
     "system-test": "node test/systemTest.js",
     "lint": "echo 'Code style check passed'",
     "build": "echo 'Build step completed - Node.js project ready'",
-    "deploy": "echo 'Ready for deployment'"
+    "deploy": "echo 'Ready for deployment'",
+    "deploy:direct": "bash deploy/direct-deploy.sh",
+    "setup:vm": "bash deploy/vm-setup.sh"
   },
   "dependencies": {
     "axios": "^1.6.2",
