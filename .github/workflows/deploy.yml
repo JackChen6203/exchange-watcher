@@ -57,6 +57,7 @@ jobs:
         # 複製到服務器
         scp /tmp/deploy-temp/../app.tar.gz ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
         scp deploy/direct-deploy.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        scp deploy/server-fix.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
         
         # 清理臨時文件
         rm -rf /tmp/deploy-temp /tmp/app.tar.gz
@@ -73,16 +74,13 @@ jobs:
           chmod +x ~/direct-deploy.sh
           ~/direct-deploy.sh
           
-          # 修復 Git 權限問題
-          if [ -d "/home/$USER/crypto-exchange-monitor/.git" ]; then
-            sudo chown -R $USER:$USER /home/$USER/crypto-exchange-monitor/
-            cd /home/$USER/crypto-exchange-monitor
-            git config --global --add safe.directory /home/$USER/crypto-exchange-monitor
-          fi
+          # 執行伺服器修復腳本
+          chmod +x ~/server-fix.sh
+          ~/server-fix.sh
           
           # 清理
           cd ~
-          rm -rf ~/app-temp ~/app.tar.gz ~/direct-deploy.sh
+          rm -rf ~/app-temp ~/app.tar.gz ~/direct-deploy.sh ~/server-fix.sh
         EOF
     
     - name: Health Check
