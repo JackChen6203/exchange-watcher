@@ -44,8 +44,10 @@ API_KEY=your_bitget_api_key
 API_SECRET=your_bitget_api_secret  
 API_PASSPHRASE=your_bitget_passphrase
 
-# Discord Webhook
+# Discord Webhook URLs
 DISCORD_WEBHOOK_URL=your_discord_webhook_url
+FUNDING_RATE_WEBHOOK_URL=your_funding_rate_webhook_url  
+POSITION_WEBHOOK_URL=your_position_webhook_url
 
 # 監控閾值 (可選)
 PRICE_CHANGE_THRESHOLD=10

@@ -17,7 +17,7 @@ const config = {
   
   // Discord Webhook
   discord: {
-    webhookUrl: process.env.DISCORD_WEBHOOK_URL || 'https://discord.com/api/webhooks/1401056427753214093/VkCT9tZKFDcRjjBbsaze7bcIbgDOFFAb4qGx17fXq07S9gwkLPYSTU8xW7YOT8koBa9N',
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL,
     fundingRateWebhookUrl: process.env.FUNDING_RATE_WEBHOOK_URL,
     positionWebhookUrl: process.env.POSITION_WEBHOOK_URL
   },

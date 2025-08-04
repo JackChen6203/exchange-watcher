@@ -28,12 +28,14 @@ cp .env.example .env
 
 在 `.env` 文件中填入：
 ```env
-API_KEY=your_okx_api_key
-API_SECRET=your_okx_secret_key  
-API_PASSPHRASE=your_okx_passphrase
+API_KEY=your_api_key
+API_SECRET=your_api_secret  
+API_PASSPHRASE=your_api_passphrase
 
-# Discord webhook已預設，可直接使用
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/1401056427753214093/VkCT9tZKFDcRjjBbsaze7bcIbgDOFFAb4qGx17fXq07S9gwkLPYSTU8xW7YOT8koBa9N
+# Discord Webhook URLs - 請設定您自己的 webhook
+DISCORD_WEBHOOK_URL=your_discord_webhook_url
+FUNDING_RATE_WEBHOOK_URL=your_funding_rate_webhook_url
+POSITION_WEBHOOK_URL=your_position_webhook_url
 ```
 
 ### 3. 測試連接

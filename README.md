@@ -35,13 +35,15 @@
 ### 環境變數 (.env)
 
 ```env
-# 交易所 API 配置 (以OKX為例)
+# 交易所 API 配置
 API_KEY=your_api_key_here
 API_SECRET=your_api_secret_here
 API_PASSPHRASE=your_passphrase_here
 
-# Discord Webhook (已預設提供的webhook)
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/1401056427753214093/VkCT9tZKFDcRjjBbsaze7bcIbgDOFFAb4qGx17fXq07S9gwkLPYSTU8xW7YOT8koBa9N
+# Discord Webhook URLs
+DISCORD_WEBHOOK_URL=your_discord_webhook_url
+FUNDING_RATE_WEBHOOK_URL=your_funding_rate_webhook_url
+POSITION_WEBHOOK_URL=your_position_webhook_url
 
 # 監控閾值
 PRICE_CHANGE_THRESHOLD=5      # 價格變動百分比閾值

@@ -21,8 +21,8 @@ class ContractMonitor {
     this.dataUpdateInterval = null;    // 數據更新定時器
     this.fundingRateAlertInterval = null; // 資金費率提醒定時器
     
-    // Discord Webhooks
-    this.positionWebhook = 'https://discord.com/api/webhooks/1384011791914237962/c1hWWCeOgFmt9ZcVKZ0vi2u0yo5KoEJsNgsx0vCAWLd-fxLzHfVg80Ap1NOyTt0SIqMF';
+    // Discord Webhooks - 從配置檔案讀取
+    this.positionWebhook = config.discord.positionWebhookUrl;
     
     // 報告間隔配置
     this.reportIntervals = {
@@ -506,6 +506,12 @@ class ContractMonitor {
 
   async sendToPositionWebhook(embed) {
     try {
+      // 檢查 webhook URL 是否設定
+      if (!this.positionWebhook) {
+        this.logger.warn('⚠️ 持倉專用 webhook URL 未設定，跳過發送');
+        return;
+      }
+      
       const axios = require('axios');
       await axios.post(this.positionWebhook, {
         embeds: [embed]
