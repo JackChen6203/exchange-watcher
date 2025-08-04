@@ -1,10 +1,12 @@
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
+const Logger = require('../utils/logger');
 
 class DatabaseManager {
   constructor(config) {
     this.config = config;
+    this.logger = new Logger(config);
     this.dbPath = path.join(process.cwd(), 'data', 'monitor.db');
     this.db = null;
     
@@ -23,10 +25,10 @@ class DatabaseManager {
     return new Promise((resolve, reject) => {
       this.db = new sqlite3.Database(this.dbPath, (err) => {
         if (err) {
-          console.error('❌ 數據庫連接失敗:', err.message);
+          this.logger.error('數據庫連接失敗:', err.message);
           reject(err);
         } else {
-          console.log('✅ 數據庫連接成功');
+          this.logger.info('數據庫連接成功');
           this.createTables().then(resolve).catch(reject);
         }
       });
@@ -102,7 +104,7 @@ class DatabaseManager {
         await this.runQuery(indexQuery);
       }
       
-      console.log('✅ 數據庫表結構初始化完成');
+      this.logger.info('數據庫表結構初始化完成');
     } catch (error) {
       console.error('❌ 創建數據庫表失敗:', error);
       throw error;
@@ -226,6 +228,15 @@ class DatabaseManager {
     return await this.allQuery(sql, [symbol, startTime]);
   }
 
+  // 獲取歷史持倉量數據（別名方法，用於測試兼容性）
+  async getHistoricalOpenInterest(symbol, startTime, endTime) {
+    const sql = `SELECT * FROM open_interest 
+      WHERE symbol = ? AND timestamp >= ? AND timestamp <= ?
+      ORDER BY timestamp DESC`;
+    
+    return await this.allQuery(sql, [symbol, startTime, endTime]);
+  }
+
   // 獲取歷史資金費率數據
   async getFundingRateHistory(symbol, hours = 24) {
     const sql = `SELECT * FROM funding_rate 
@@ -305,7 +316,7 @@ class DatabaseManager {
     for (const table of tables) {
       const sql = `DELETE FROM ${table} WHERE timestamp < ?`;
       const result = await this.runQuery(sql, [thirtyDaysAgo]);
-      console.log(`🗑️ 清理 ${table} 表，刪除 ${result.changes} 條舊記錄`);
+      this.logger.info(`清理 ${table} 表，刪除 ${result.changes} 條舊記錄`);
     }
   }
 
@@ -314,9 +325,9 @@ class DatabaseManager {
     if (this.db) {
       this.db.close((err) => {
         if (err) {
-          console.error('❌ 關閉數據庫失敗:', err.message);
+          this.logger.error('關閉數據庫失敗:', err.message);
         } else {
-          console.log('✅ 數據庫連接已關閉');
+          this.logger.info('數據庫連接已關閉');
         }
       });
     }

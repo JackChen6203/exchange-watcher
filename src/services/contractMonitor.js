@@ -21,8 +21,8 @@ class ContractMonitor {
     this.dataUpdateInterval = null;    // 數據更新定時器
     this.fundingRateAlertInterval = null; // 資金費率提醒定時器
     
-    // Discord Webhooks - 從環境變數獲取
-    this.positionWebhook = config.discord.positionWebhookUrl || config.discord.webhookUrl;
+    // Discord Webhooks - 從配置檔案讀取
+    this.positionWebhook = config.discord.positionWebhookUrl;
     
     // 報告間隔配置
     this.reportIntervals = {
@@ -419,7 +419,7 @@ class ContractMonitor {
       timestamp: now.toISOString(),
       footer: {
         text: 'Bitget 合約監控',
-        icon_url: config.discord.icons.chart
+        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png'
       }
     };
 
@@ -443,7 +443,7 @@ class ContractMonitor {
       timestamp: now.toISOString(),
       footer: {
         text: 'Bitget 合約監控',
-        icon_url: config.discord.icons.money
+        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4b0.png'
       }
     };
 
@@ -506,6 +506,12 @@ class ContractMonitor {
 
   async sendToPositionWebhook(embed) {
     try {
+      // 檢查 webhook URL 是否設定
+      if (!this.positionWebhook) {
+        this.logger.warn('⚠️ 持倉專用 webhook URL 未設定，跳過發送');
+        return;
+      }
+      
       const axios = require('axios');
       await axios.post(this.positionWebhook, {
         embeds: [embed]
@@ -548,7 +554,7 @@ class ContractMonitor {
         timestamp: now.toISOString(),
         footer: {
           text: 'Bitget 資金費率提醒',
-          icon_url: config.discord.icons.clock
+          icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/23f0.png'
         }
       };
 

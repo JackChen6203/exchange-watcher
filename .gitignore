@@ -37,8 +37,8 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 
-# Docker
-.dockerignore
+# 部署相關
+*.tar.gz
 
 # 構建輸出
 dist/

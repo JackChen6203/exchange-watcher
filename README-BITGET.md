@@ -34,13 +34,15 @@ npm install
 ### 2. 配置Bitget API
 創建 `.env` 文件：
 ```env
-# Bitget API 配置 (已配置)
-API_KEY=bg_cb9290e4baa344c68c3067298212887b
-API_SECRET=8f0b89aeefee5c73fc148a1eebe41b39ce194f357b02f806b8df3072718103fa
-API_PASSPHRASE=a126182900
+# Bitget API 配置
+API_KEY=your_bitget_api_key
+API_SECRET=your_bitget_api_secret
+API_PASSPHRASE=your_bitget_passphrase
 
-# Discord Webhook (已配置)
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/1401056427753214093/VkCT9tZKFDcRjjBbsaze7bcIbgDOFFAb4qGx17fXq07S9gwkLPYSTU8xW7YOT8koBa9N
+# Discord Webhook URLs
+DISCORD_WEBHOOK_URL=your_discord_webhook_url
+FUNDING_RATE_WEBHOOK_URL=your_funding_rate_webhook_url
+POSITION_WEBHOOK_URL=your_position_webhook_url
 
 # 監控配置
 PRICE_CHANGE_THRESHOLD=5      # 價格變動百分比閾值
