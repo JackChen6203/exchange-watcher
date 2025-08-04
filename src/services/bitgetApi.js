@@ -509,6 +509,78 @@ class BitgetApi {
       return false;
     }
   }
+  // 獲取K線數據
+  async getKline(symbol, productType = 'umcbl', granularity = '15m', limit = 100) {
+    try {
+      const requestPath = `/api/v2/mix/market/candles`;
+      const params = new URLSearchParams({
+        symbol: symbol,
+        productType: productType,
+        granularity: granularity,
+        limit: limit.toString()
+      });
+      
+      const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
+        timeout: 10000
+      });
+
+      if (response.data.code === '00000' && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(`獲取K線數據失敗: ${response.data.msg}`);
+      }
+    } catch (error) {
+      console.error(`❌ 獲取${symbol} K線數據失敗:`, error.response?.data?.msg || error.message);
+      throw error;
+    }
+  }
+
+  // 獲取單個交易對的ticker數據
+  async getTicker(symbol, productType = 'umcbl') {
+    try {
+      const requestPath = `/api/v2/mix/market/ticker`;
+      const params = new URLSearchParams({
+        symbol: symbol,
+        productType: productType
+      });
+      
+      const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
+        timeout: 10000
+      });
+
+      if (response.data.code === '00000' && response.data.data && response.data.data.length > 0) {
+        return response.data.data[0];
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error(`❌ 獲取${symbol} ticker數據失敗:`, error.response?.data?.msg || error.message);
+      return null;
+    }
+  }
+
+  // 獲取所有合約
+  async getAllContracts(productType = 'umcbl') {
+    try {
+      const requestPath = `/api/v2/mix/market/contracts`;
+      const params = new URLSearchParams({
+        productType: productType
+      });
+      
+      const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
+        timeout: 10000
+      });
+
+      if (response.data.code === '00000' && response.data.data) {
+        return response.data.data;
+      } else {
+        throw new Error(`獲取合約列表失敗: ${response.data.msg}`);
+      }
+    } catch (error) {
+      console.error(`❌ 獲取合約列表失敗:`, error.response?.data?.msg || error.message);
+      throw error;
+    }
+  }
 }
 
 module.exports = BitgetApi;

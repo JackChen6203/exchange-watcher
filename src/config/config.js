@@ -19,7 +19,9 @@ const config = {
   discord: {
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
     fundingRateWebhookUrl: process.env.FUNDING_RATE_WEBHOOK_URL,
-    positionWebhookUrl: process.env.POSITION_WEBHOOK_URL
+    positionWebhookUrl: process.env.POSITION_WEBHOOK_URL,
+    priceAlertWebhookUrl: process.env.PRICE_ALERT_WEBHOOK_URL,
+    swingStrategyWebhookUrl: process.env.SWING_STRATEGY_WEBHOOK_URL
   },
   
   // 監控閾值
