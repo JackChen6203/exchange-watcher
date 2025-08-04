@@ -1,4 +1,4 @@
-name: Deploy to GCP
+name: Direct Deploy to GCP VM
 
 on:
   push:
@@ -23,48 +23,18 @@ jobs:
       run: npm ci
     
     - name: Run tests
-      run: npm test --if-present
+      run: npm run test:enhanced --if-present
     
     - name: Lint code
       run: npm run lint --if-present
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Build Docker image
-      run: |
-        docker build -t crypto-exchange-monitor:${{ github.sha }} .
-        docker tag crypto-exchange-monitor:${{ github.sha }} crypto-exchange-monitor:latest
-    
-    - name: Save Docker image
-      run: |
-        docker save crypto-exchange-monitor:latest | gzip > crypto-exchange-monitor.tar.gz
-    
-    - name: Upload Docker image artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: docker-image
-        path: crypto-exchange-monitor.tar.gz
-
   deploy:
-    needs: [test, build]
+    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/fix-errors'
     
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Download Docker image artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: docker-image
     
     - name: Setup SSH
       run: |
@@ -73,63 +43,79 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts
     
-    - name: Copy files to GCP
+    - name: Deploy to GCP VM
       run: |
-        scp crypto-exchange-monitor.tar.gz ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
-        scp deploy/deploy.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
-        scp deploy/install-docker.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
-        scp deploy/quick-fix-deploy.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
-        scp deploy/docker-compose.yml ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
-    
-    - name: Deploy to GCP
-      run: |
+        # 創建臨時目錄並複製文件（避免 tar 錯誤）
+        mkdir -p /tmp/deploy-temp
+        rsync -av --exclude='node_modules' --exclude='.git' --exclude='*.tar.gz' --exclude='.github' . /tmp/deploy-temp/
+        
+        # 創建部署包
+        cd /tmp/deploy-temp
+        tar -czf ../app.tar.gz .
+        cd -
+        
+        # 複製到服務器
+        scp /tmp/deploy-temp/../app.tar.gz ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        scp deploy/direct-deploy.sh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:~/
+        
+        # 清理臨時文件
+        rm -rf /tmp/deploy-temp /tmp/app.tar.gz
+        
+        # 執行部署
         ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
-          # Check if Docker is installed, if not, use quick-fix-deploy
-          if ! command -v docker &> /dev/null; then
-            echo "Docker not found, using quick-fix deployment..."
-            chmod +x quick-fix-deploy.sh
-            ./quick-fix-deploy.sh
-          else
-            # Docker is available, use normal deployment
-            echo "Docker found, using normal deployment..."
-            gunzip -c crypto-exchange-monitor.tar.gz | docker load
-            chmod +x deploy.sh
-            ./deploy.sh
-            rm crypto-exchange-monitor.tar.gz deploy.sh
-          fi
+          # 解壓縮應用程式
+          rm -rf ~/app-temp
+          mkdir ~/app-temp
+          cd ~/app-temp
+          tar -xzf ~/app.tar.gz
           
-          # Clean up
-          rm -f quick-fix-deploy.sh install-docker.sh
+          # 執行部署腳本
+          chmod +x ~/direct-deploy.sh
+          ~/direct-deploy.sh
+          
+          # 清理
+          cd ~
+          rm -rf ~/app-temp ~/app.tar.gz ~/direct-deploy.sh
         EOF
     
     - name: Health Check
       run: |
         sleep 30
         ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'EOF'
-          # Check if containers are running (try with and without sudo)
-          if docker ps 2>/dev/null | grep -q crypto-exchange-monitor; then
-            echo "Container running (no sudo needed)"
-            docker logs crypto-exchange-monitor --tail 50
-          elif sudo docker ps 2>/dev/null | grep -q crypto-exchange-monitor; then
-            echo "Container running (sudo required)"
-            sudo docker logs crypto-exchange-monitor --tail 50
+          # 檢查 PM2 狀態
+          if pm2 list | grep -q "crypto-monitor.*online"; then
+            echo "✅ 應用程式運行正常"
+            pm2 list
+            echo "--- 最近日誌 ---"
+            pm2 logs crypto-monitor --lines 20 --nostream
           else
-            echo "❌ Container not found!"
-            echo "Available containers:"
-            docker ps 2>/dev/null || sudo docker ps 2>/dev/null || echo "Cannot access Docker"
+            echo "❌ 應用程式運行異常"
+            pm2 list
+            pm2 logs crypto-monitor --lines 50 --nostream
             exit 1
           fi
         EOF
     
-    - name: Notify Success
+    - name: Show Management Commands
       if: success()
       run: |
-        echo "✅ Deployment to GCP successful!"
-        echo "Commit: ${{ github.sha }}"
-        echo "Branch: ${{ github.ref_name }}"
+        echo "✅ 部署成功！"
+        echo ""
+        echo "📋 管理命令："
+        echo "ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"
+        echo "pm2 list              # 查看服務狀態"
+        echo "pm2 logs crypto-monitor -f  # 查看即時日誌"
+        echo "pm2 restart crypto-monitor   # 重啟服務"
+        echo "pm2 monit            # 監控介面"
+        echo ""
+        echo "📁 重要路徑："
+        echo "/home/${{ secrets.GCP_USER }}/crypto-exchange-monitor/.env  # 配置檔案"
+        echo "/home/${{ secrets.GCP_USER }}/logs/                        # 日誌目錄"
+        echo "/home/${{ secrets.GCP_USER }}/data/                        # 數據目錄"
     
     - name: Notify Failure
       if: failure()
       run: |
-        echo "❌ Deployment to GCP failed!"
-        echo "Please check the logs above for details."
+        echo "❌ 直接部署失敗！"
+        echo "請檢查上方日誌或 SSH 到服務器手動檢查："
+        echo "ssh ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}"

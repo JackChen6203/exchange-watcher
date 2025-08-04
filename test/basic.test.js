@@ -33,14 +33,14 @@ if (require.main === module) {
     if (!fs.existsSync(indexPath)) throw new Error('主要入口檔案不存在');
   })) passed++; else failed++;
 
-  if (test('應該有 Dockerfile', () => {
-    const dockerfilePath = path.join(__dirname, '..', 'Dockerfile');
-    if (!fs.existsSync(dockerfilePath)) throw new Error('Dockerfile 不存在');
+  if (test('應該有直接部署腳本', () => {
+    const deployScriptPath = path.join(__dirname, '..', 'deploy', 'direct-deploy.sh');
+    if (!fs.existsSync(deployScriptPath)) throw new Error('直接部署腳本不存在');
   })) passed++; else failed++;
 
-  if (test('應該有部署腳本', () => {
-    const deployScriptPath = path.join(__dirname, '..', 'deploy', 'deploy.sh');
-    if (!fs.existsSync(deployScriptPath)) throw new Error('部署腳本不存在');
+  if (test('應該有 VM 設置腳本', () => {
+    const vmSetupPath = path.join(__dirname, '..', 'deploy', 'vm-setup.sh');
+    if (!fs.existsSync(vmSetupPath)) throw new Error('VM 設置腳本不存在');
   })) passed++; else failed++;
 
   // 配置檔案檢查
@@ -51,9 +51,9 @@ if (require.main === module) {
     if (!fs.existsSync(envTemplatePath)) throw new Error('環境變數範本不存在');
   })) passed++; else failed++;
 
-  if (test('應該有 Docker Compose 配置', () => {
-    const composePath = path.join(__dirname, '..', 'deploy', 'docker-compose.yml');
-    if (!fs.existsSync(composePath)) throw new Error('Docker Compose 配置不存在');
+  if (test('應該有增強版入口檔案', () => {
+    const enhancedIndexPath = path.join(__dirname, '..', 'src', 'enhancedIndex.js');
+    if (!fs.existsSync(enhancedIndexPath)) throw new Error('增強版入口檔案不存在');
   })) passed++; else failed++;
 
   if (test('應該有 GitHub Actions 工作流程', () => {

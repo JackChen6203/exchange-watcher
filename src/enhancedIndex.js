@@ -77,11 +77,11 @@ class EnhancedCryptoExchangeMonitor {
     optionalWebhooks.forEach(path => {
       const value = this.getNestedValue(this.config, path);
       if (!value) {
-        console.log(`⚠️ 可選配置未設置，將使用預設webhook: ${path}`);
+        this.logger.warn(`可選配置未設置，將使用預設webhook: ${path}`);
       }
     });
 
-    console.log('✅ 配置驗證通過');
+    this.logger.info('配置驗證通過');
     return true;
   }
 
@@ -91,7 +91,7 @@ class EnhancedCryptoExchangeMonitor {
 
   setupGracefulShutdown() {
     const shutdown = async (signal) => {
-      console.log(`\n📴 收到 ${signal} 信號，正在優雅關閉...`);
+      this.logger.console(`收到 ${signal} 信號，正在優雅關閉...`);
       
       try {
         this.isRunning = false;
@@ -107,7 +107,7 @@ class EnhancedCryptoExchangeMonitor {
           details: `收到 ${signal} 信號`
         });
         
-        console.log('✅ 系統已優雅關閉');
+        this.logger.console('系統已優雅關閉');
         process.exit(0);
         
       } catch (error) {
@@ -146,7 +146,7 @@ class EnhancedCryptoExchangeMonitor {
 
   async sendTestMessage() {
     try {
-      console.log('📧 發送測試消息...');
+      this.logger.console('發送測試消息...');
       
       const testEmbed = {
         title: '🧪 增強型系統測試',
@@ -188,7 +188,7 @@ class EnhancedCryptoExchangeMonitor {
         }
       });
       
-      console.log('✅ 測試消息發送成功');
+      this.logger.console('測試消息發送成功');
       
     } catch (error) {
       console.error('❌ 測試消息發送失敗:', error);

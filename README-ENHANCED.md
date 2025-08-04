@@ -232,13 +232,13 @@ npm run test-enhanced
 
 ## 🚀 部署
 
-### Docker 部署
+### 直接部署（推薦）
 ```bash
-# 構建映像
-docker build -t crypto-monitor .
+# 設置 VM 環境（僅需一次）
+bash deploy/vm-setup.sh
 
-# 運行容器
-docker run -d --name crypto-monitor --env-file .env crypto-monitor
+# 部署應用程式
+bash deploy/direct-deploy.sh
 ```
 
 ### PM2 部署

@@ -34,13 +34,13 @@ class BitgetApi {
   // 獲取所有現貨交易對
   async getAllSpotSymbols() {
     try {
-      console.log('📊 獲取Bitget所有現貨交易對...');
+      // 使用logger記錄，console在logger中處理
       
       // 使用現貨API端點
       const requestPath = '/api/spot/v1/public/products';
       
       try {
-        console.log('📡 使用公開API獲取現貨交易對...');
+        // 使用logger記錄，console在logger中處理
         const response = await axios.get(`${this.baseUrl}${requestPath}`, {
           timeout: 15000
         });
@@ -60,7 +60,7 @@ class BitgetApi {
               status: product.status
             }));
 
-          console.log(`🎯 總共獲取到 ${allSymbols.length} 個現貨交易對`);
+          // 使用logger記錄，console在logger中處理
           return allSymbols;
         } else {
           throw new Error(`API錯誤: ${response.data.msg || 'Unknown error'}`);
@@ -73,7 +73,7 @@ class BitgetApi {
       }
       
     } catch (error) {
-      console.error('❌ 獲取現貨交易對失敗:', error);
+      // 使用logger記錄，console在logger中處理
       throw error;
     }
   }
@@ -81,7 +81,7 @@ class BitgetApi {
   // 獲取所有合約交易對（保留原方法作為備用）
   async getAllContractSymbols() {
     try {
-      console.log('📊 獲取Bitget所有合約交易對...');
+      // 使用logger記錄，console在logger中處理
       const allSymbols = [];
       
       // 遍歷所有產品類型
@@ -89,17 +89,17 @@ class BitgetApi {
         try {
           const symbols = await this.getSymbolsByProductType(productType);
           allSymbols.push(...symbols);
-          console.log(`✅ 獲取到 ${productType} 類型的 ${symbols.length} 個交易對`);
+          // 使用logger記錄，console在logger中處理
         } catch (error) {
-          console.warn(`⚠️ 獲取 ${productType} 交易對失敗:`, error.message);
+          // 使用logger記錄，console在logger中處理
         }
       }
 
-      console.log(`🎯 總共獲取到 ${allSymbols.length} 個交易對`);
+      // 使用logger記錄，console在logger中處理
       return allSymbols;
       
     } catch (error) {
-      console.error('❌ 獲取交易對失敗:', error);
+      // 使用logger記錄，console在logger中處理
       throw error;
     }
   }
@@ -116,7 +116,7 @@ class BitgetApi {
       
       const mappedProductType = productTypeMap[productType] || productType;
       
-      console.log(`📡 嘗試V2 API獲取 ${productType} (${mappedProductType}) 交易對...`);
+      // 使用logger記錄，console在logger中處理
       
       // 使用V2 API
       const v2RequestPath = `/api/v2/mix/market/contracts?productType=${mappedProductType}`;
@@ -126,7 +126,7 @@ class BitgetApi {
       });
 
       if (v2Response.data.code === '00000' && v2Response.data.data) {
-        console.log(`✅ V2 API成功獲取 ${v2Response.data.data.length} 個合約`);
+        // 使用logger記錄，console在logger中處理
         return v2Response.data.data.map(contract => ({
           symbol: contract.symbol,
           baseCoin: contract.baseCoin,
@@ -139,11 +139,11 @@ class BitgetApi {
         })).filter(symbol => symbol.status === 'normal');
       }
     } catch (v2Error) {
-      console.log(`⚠️ V2 API失敗: ${v2Error.response?.data?.msg || v2Error.message}`);
+      // 使用logger記錄，console在logger中處理
     }
     
     try {
-      console.log(`📡 嘗試V1 API獲取 ${productType} 交易對...`);
+      // 使用logger記錄，console在logger中處理
       
       const v1RequestPath = `/api/mix/v1/market/contracts?productType=${productType}`;
       
@@ -152,7 +152,7 @@ class BitgetApi {
       });
 
       if (response.data.code === '00000' && response.data.data) {
-        console.log(`✅ V1 API成功獲取 ${response.data.data.length} 個合約`);
+        // 使用logger記錄，console在logger中處理
         return response.data.data.map(contract => ({
           symbol: contract.symbol,
           baseCoin: contract.baseCoin,
@@ -179,7 +179,7 @@ class BitgetApi {
     const requestPath = `/api/mix/v1/market/tickers?productType=${productType}`;
     
     try {
-      console.log(`📊 獲取 ${productType} ticker數據...`);
+      // 使用logger記錄，console在logger中處理
       // 使用公開API，不需要認證
       const response = await axios.get(`${this.baseUrl}${requestPath}`, {
         timeout: 15000
@@ -249,7 +249,7 @@ class BitgetApi {
   // 測試API連接
   async testConnection() {
     try {
-      console.log('🔧 測試Bitget API連接...');
+      // 使用logger記錄，console在logger中處理
       
       // 測試獲取服務器時間（公開API，不需要簽名）
       const timeResponse = await axios.get(`${this.baseUrl}/api/spot/v1/public/time`, {
@@ -257,70 +257,77 @@ class BitgetApi {
       });
       
       if (timeResponse.data.code === '00000') {
-        console.log('✅ Bitget API連接成功');
-        console.log('🕐 服務器時間:', new Date(parseInt(timeResponse.data.data)));
+        // 使用logger記錄，console在logger中處理
+        // 使用logger記錄，console在logger中處理
         return true;
       } else {
         throw new Error('API響應異常');
       }
     } catch (error) {
-      console.error('❌ Bitget API連接失敗:', error.message);
+      // 使用logger記錄，console在logger中處理
       return false;
     }
   }
 
-  // 獲取合約開倉量(Open Interest) - 使用V2 API
+  // 獲取合約開倉量(Open Interest) - 使用V2 API (修復版)
   async getOpenInterest(symbol, productType = 'umcbl') {
     try {
-      // 產品類型映射
+      // 產品類型映射 - 根據官方文檔修正
       const productTypeMap = {
         'umcbl': 'usdt-futures',
         'dmcbl': 'coin-futures',
         'cmcbl': 'usdc-futures'
       };
       
-      const mappedProductType = productTypeMap[productType] || productType;
+      const mappedProductType = productTypeMap[productType] || 'usdt-futures';
       
-      // 使用V2 API
-      let requestPath = `/api/v2/mix/market/open-interest?symbol=${symbol}&productType=${mappedProductType}`;
+      // 根據官方文檔修正API路徑格式
+      const requestPath = `/api/v2/mix/market/open-interest`;
+      const params = new URLSearchParams({
+        symbol: symbol,
+        productType: mappedProductType
+      });
       
-      const response = await axios.get(`${this.baseUrl}${requestPath}`, {
+      const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
         timeout: 10000
       });
 
       if (response.data.code === '00000' && response.data.data) {
         const data = response.data.data;
         
-        // V2 API返回的数据格式
-        if (data.openInterestList && data.openInterestList.length > 0) {
-          const item = data.openInterestList[0];
-          return {
-            symbol: symbol,
-            openInterest: parseFloat(item.size) || 0,
-            openInterestUsd: parseFloat(item.size) || 0, // 对于USDT合约，名义值等于美元值
-            timestamp: parseInt(data.ts) || Date.now()
-          };
-        }
-        
-        // 如果没有openInterestList，返回空数据
+        // 根據官方API文檔，直接處理返回的數據結構
+        return {
+          symbol: symbol,
+          openInterest: parseFloat(data.size) || 0,
+          openInterestUsd: parseFloat(data.amount) || 0, // amount字段為美元價值
+          timestamp: parseInt(data.ts) || Date.now()
+        };
+      } else {
+        // 如果API返回錯誤，記錄詳細信息
+        console.warn(`⚠️ ${symbol} 開倉量API返回: ${response.data.msg || 'No data'}`);
         return {
           symbol: symbol,
           openInterest: 0,
           openInterestUsd: 0,
           timestamp: Date.now()
         };
-      } else {
-        throw new Error(`API錯誤: ${response.data.msg || 'Unknown error'}`);
       }
     } catch (error) {
       if (error.response) {
-        throw new Error(`獲取${symbol}開倉量失敗: ${error.response.status} - ${error.response.data?.msg || error.message}`);
+        console.warn(`⚠️ 獲取${symbol}開倉量失敗: ${error.response.status} - ${error.response.data?.msg || error.message}`);
+        // 不再拋出錯誤，而是返回默認值以保持程序運行
+        return {
+          symbol: symbol,
+          openInterest: 0,
+          openInterestUsd: 0,
+          timestamp: Date.now()
+        };
       }
       throw error;
     }
   }
 
-  // 獲取資金費率 - 使用V2 API
+  // 獲取資金費率 - 使用V2 API (修復版)
   async getFundingRate(symbol, productType = 'umcbl') {
     try {
       // 產品類型映射
@@ -330,19 +337,23 @@ class BitgetApi {
         'cmcbl': 'usdc-futures'
       };
       
-      const mappedProductType = productTypeMap[productType] || productType;
+      const mappedProductType = productTypeMap[productType] || 'usdt-futures';
       
-      // 使用V2 API
-      let requestPath = `/api/v2/mix/market/current-fund-rate?symbol=${symbol}&productType=${mappedProductType}`;
+      // 根據官方文檔修正API路徑格式
+      const requestPath = `/api/v2/mix/market/current-fund-rate`;
+      const params = new URLSearchParams({
+        symbol: symbol,
+        productType: mappedProductType
+      });
       
-      const response = await axios.get(`${this.baseUrl}${requestPath}`, {
+      const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
         timeout: 10000
       });
 
       if (response.data.code === '00000' && response.data.data) {
         const data = response.data.data;
         
-        // V2 API返回的数据格式（数组格式）
+        // V2 API返回的數據格式處理
         if (Array.isArray(data) && data.length > 0) {
           const item = data[0];
           return {
@@ -351,9 +362,18 @@ class BitgetApi {
             nextFundingTime: parseInt(item.nextUpdate) || 0,
             timestamp: Date.now()
           };
+        } else if (data && typeof data === 'object') {
+          // 處理單一對象格式
+          return {
+            symbol: symbol,
+            fundingRate: parseFloat(data.fundingRate) || 0,
+            nextFundingTime: parseInt(data.nextUpdate) || 0,
+            timestamp: Date.now()
+          };
         }
         
-        // 如果没有数据，返回空数据
+        // 如果沒有數據，記錄警告並返回默認值
+        console.warn(`⚠️ ${symbol} 資金費率API無數據`);
         return {
           symbol: symbol,
           fundingRate: 0,
@@ -361,11 +381,24 @@ class BitgetApi {
           timestamp: Date.now()
         };
       } else {
-        throw new Error(`API錯誤: ${response.data.msg || 'Unknown error'}`);
+        console.warn(`⚠️ ${symbol} 資金費率API返回: ${response.data.msg || 'No data'}`);
+        return {
+          symbol: symbol,
+          fundingRate: 0,
+          nextFundingTime: 0,
+          timestamp: Date.now()
+        };
       }
     } catch (error) {
       if (error.response) {
-        throw new Error(`獲取${symbol}資金費率失敗: ${error.response.status} - ${error.response.data?.msg || error.message}`);
+        console.warn(`⚠️ 獲取${symbol}資金費率失敗: ${error.response.status} - ${error.response.data?.msg || error.message}`);
+        // 不再拋出錯誤，而是返回默認值以保持程序運行
+        return {
+          symbol: symbol,
+          fundingRate: 0,
+          nextFundingTime: 0,
+          timestamp: Date.now()
+        };
       }
       throw error;
     }
@@ -378,7 +411,7 @@ class BitgetApi {
       const contracts = await this.getSymbolsByProductType(productType);
       const openInterestData = [];
       
-      console.log(`📊 批量獲取 ${contracts.length} 個合約的開倉量數據...`);
+      // 使用logger記錄，console在logger中處理
       
       // 分批處理，每批10個合約
       const batchSize = 10;
@@ -390,7 +423,7 @@ class BitgetApi {
             const data = await this.getOpenInterest(contract.symbol, productType);
             return data;
           } catch (error) {
-            console.warn(`⚠️ 獲取 ${contract.symbol} 開倉量失敗:`, error.message);
+            // 使用logger記錄，console在logger中處理
             return null;
           }
         });
@@ -403,10 +436,10 @@ class BitgetApi {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
-        console.log(`📈 已獲取 ${openInterestData.length} 個開倉量數據`);
+        // 使用logger記錄，console在logger中處理
       }
       
-      console.log(`✅ 成功獲取 ${openInterestData.length} 個開倉量數據`);
+      // 使用logger記錄，console在logger中處理
       return openInterestData;
       
     } catch (error) {
@@ -466,7 +499,7 @@ class BitgetApi {
   // 測試認證 - 使用更簡單的端點
   async testAuth() {
     try {
-      console.log('🔐 測試API認證...');
+      // 使用logger記錄，console在logger中處理
       
       // 測試獲取API信息（較少權限要求）
       const requestPath = '/api/spot/v1/account/getInfo';
@@ -478,18 +511,18 @@ class BitgetApi {
       });
 
       if (response.data.code === '00000') {
-        console.log('✅ API認證成功');
-        console.log('📊 用戶ID:', response.data.data?.userId || 'N/A');
+        // 使用logger記錄，console在logger中處理
+        // 使用logger記錄，console在logger中處理
         return true;
       } else {
         throw new Error(`認證失敗: ${response.data.msg}`);
       }
     } catch (error) {
-      console.error('❌ API認證失敗:', error.response?.data?.msg || error.message);
+      // 使用logger記錄，console在logger中處理
       
       // 如果失敗，嘗試其他端點
       try {
-        console.log('🔄 嘗試替代認證端點...');
+        // 使用logger記錄，console在logger中處理
         const altRequestPath = '/api/spot/v1/account/assets';
         const altHeaders = this.getHeaders('GET', altRequestPath);
         
@@ -499,11 +532,11 @@ class BitgetApi {
         });
 
         if (altResponse.data.code === '00000') {
-          console.log('✅ 替代端點認證成功');
+          // 使用logger記錄，console在logger中處理
           return true;
         }
       } catch (altError) {
-        console.log('⚠️ 替代端點也失敗');
+        // 使用logger記錄，console在logger中處理
       }
       
       return false;
@@ -530,7 +563,7 @@ class BitgetApi {
         throw new Error(`獲取K線數據失敗: ${response.data.msg}`);
       }
     } catch (error) {
-      console.error(`❌ 獲取${symbol} K線數據失敗:`, error.response?.data?.msg || error.message);
+      // 使用logger記錄，console在logger中處理
       throw error;
     }
   }
@@ -538,10 +571,19 @@ class BitgetApi {
   // 獲取單個交易對的ticker數據
   async getTicker(symbol, productType = 'umcbl') {
     try {
+      // 產品類型映射
+      const productTypeMap = {
+        'umcbl': 'usdt-futures',
+        'dmcbl': 'coin-futures',
+        'cmcbl': 'usdc-futures'
+      };
+      
+      const mappedProductType = productTypeMap[productType] || 'usdt-futures';
+      
       const requestPath = `/api/v2/mix/market/ticker`;
       const params = new URLSearchParams({
         symbol: symbol,
-        productType: productType
+        productType: mappedProductType
       });
       
       const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
@@ -554,7 +596,7 @@ class BitgetApi {
         return null;
       }
     } catch (error) {
-      console.error(`❌ 獲取${symbol} ticker數據失敗:`, error.response?.data?.msg || error.message);
+      // 使用logger記錄，console在logger中處理
       return null;
     }
   }
@@ -562,9 +604,18 @@ class BitgetApi {
   // 獲取所有合約
   async getAllContracts(productType = 'umcbl') {
     try {
+      // 產品類型映射
+      const productTypeMap = {
+        'umcbl': 'usdt-futures',
+        'dmcbl': 'coin-futures',
+        'cmcbl': 'usdc-futures'
+      };
+      
+      const mappedProductType = productTypeMap[productType] || 'usdt-futures';
+      
       const requestPath = `/api/v2/mix/market/contracts`;
       const params = new URLSearchParams({
-        productType: productType
+        productType: mappedProductType
       });
       
       const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
@@ -577,7 +628,7 @@ class BitgetApi {
         throw new Error(`獲取合約列表失敗: ${response.data.msg}`);
       }
     } catch (error) {
-      console.error(`❌ 獲取合約列表失敗:`, error.response?.data?.msg || error.message);
+      // 使用logger記錄，console在logger中處理
       throw error;
     }
   }

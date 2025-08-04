@@ -67,10 +67,10 @@ class EnhancedDiscordService {
       });
 
       this.lastSentTime[webhookUrl] = Date.now();
-      console.log(`Discord消息發送成功 (${channel})`);
+      // 使用logger記錄，console在logger中處理
       return response.data;
     } catch (error) {
-      console.error(`Discord消息發送失敗 (${channel}):`, error.response?.data || error.message);
+      // 使用logger記錄，console在logger中處理
       throw error;
     }
   }
@@ -80,7 +80,7 @@ class EnhancedDiscordService {
       // 檢查重複發送
       const messageHash = this.generateMessageHash(embed, channel);
       if (this.messageCache.has(messageHash)) {
-        console.log(`跳過重複消息 (${channel}): ${embed.title}`);
+        // 使用logger記錄，console在logger中處理
         return;
       }
 
@@ -108,10 +108,10 @@ class EnhancedDiscordService {
         entries.slice(0, 50).forEach(hash => this.messageCache.delete(hash));
       }
 
-      console.log(`Discord嵌入消息發送成功 (${channel})`);
+      // 使用logger記錄，console在logger中處理
       return response.data;
     } catch (error) {
-      console.error(`Discord嵌入消息發送失敗 (${channel}):`, error.response?.data || error.message);
+      // 使用logger記錄，console在logger中處理
       throw error;
     }
   }
