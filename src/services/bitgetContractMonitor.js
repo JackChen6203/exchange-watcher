@@ -29,6 +29,7 @@ class BitgetContractMonitor {
     // 定期監控間隔
     this.monitoringInterval = null;
     this.reportingInterval = null;
+    this.fundingRateAlertInterval = null;
     
     // 數據歷史記錄
     this.dataHistory = {
@@ -61,6 +62,9 @@ class BitgetContractMonitor {
       
       // 啟動15分鐘報告
       this.startPeriodicReporting();
+      
+      // 啟動資金費率提醒
+      this.startFundingRateAlerts();
       
       this.logger.console('✅ Bitget合約監控系統初始化完成');
       
@@ -511,6 +515,97 @@ ${combinedRows.join('\n')}
     return `${sign}${changePercent.toFixed(2)}%`;
   }
 
+  startFundingRateAlerts() {
+    // 每分鐘檢查是否需要發送資金費率提醒
+    this.fundingRateAlertInterval = setInterval(() => {
+      const now = new Date();
+      const minute = now.getMinutes();
+      
+      // 在每小時的50分和55分發送提醒
+      if (minute === 50 || minute === 55) {
+        this.sendFundingRateAlert(minute);
+      }
+    }, 60 * 1000); // 每分鐘檢查一次
+    
+    this.logger.info('⏰ 啟動資金費率提醒系統 (每小時50分和55分)');
+  }
+
+  async sendFundingRateAlert(minute) {
+    try {
+      const now = new Date();
+      const timeStr = now.toLocaleString('zh-TW');
+      
+      const alertTitle = minute === 50 ? 
+        '⚠️ 資金費率提醒 - 10分鐘後結算' : 
+        '🔔 資金費率提醒 - 5分鐘後結算';
+      
+      // 生成資金費率排行榜
+      const fundingRateRankings = this.calculateFundingRateRankings();
+      
+      const alertEmbed = {
+        title: alertTitle,
+        description: `提醒時間: ${timeStr}\n下次資金費率結算即將開始`,
+        color: minute === 50 ? 0xff9900 : 0xff0000, // 50分橙色，55分紅色
+        fields: [
+          {
+            name: '🟢 最高正資金費率 TOP 10',
+            value: this.formatFundingRateRanking(fundingRateRankings.positive.slice(0, 10)),
+            inline: false
+          },
+          {
+            name: '🔴 最低負資金費率 TOP 10',
+            value: this.formatFundingRateRanking(fundingRateRankings.negative.slice(0, 10)),
+            inline: false
+          }
+        ],
+        timestamp: now.toISOString(),
+        footer: {
+          text: 'Bitget 資金費率提醒',
+          icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/23f0.png'
+        }
+      };
+
+      // 發送到資金費率專用webhook
+      await this.sendToFundingRateWebhook(alertEmbed);
+      
+      this.logger.info(`⏰ 資金費率提醒已發送 (${minute}分)`);
+      
+    } catch (error) {
+      this.logger.error('❌ 發送資金費率提醒失敗:', error);
+    }
+  }
+
+  formatFundingRateRanking(rankings) {
+    if (rankings.length === 0) {
+      return '暫無數據';
+    }
+    
+    return rankings.map((item, index) => {
+      const ratePercent = (item.fundingRate * 100).toFixed(4);
+      return `${index + 1}. **${item.symbol}** - ${ratePercent}%`;
+    }).join('\n');
+  }
+
+  async sendToFundingRateWebhook(embed) {
+    try {
+      const axios = require('axios');
+      const webhookUrl = this.config.discord.fundingRateWebhookUrl;
+      
+      if (!webhookUrl) {
+        this.logger.warn('⚠️ 資金費率Webhook URL未設置');
+        return;
+      }
+      
+      await axios.post(webhookUrl, {
+        embeds: [embed]
+      });
+      
+      this.logger.info('📤 資金費率提醒已發送到專用webhook');
+    } catch (error) {
+      this.logger.error('❌ 發送資金費率提醒到webhook失敗:', error.message);
+    }
+  }
+
   stop() {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
@@ -520,6 +615,11 @@ ${combinedRows.join('\n')}
     if (this.reportingInterval) {
       clearInterval(this.reportingInterval);
       this.reportingInterval = null;
+    }
+    
+    if (this.fundingRateAlertInterval) {
+      clearInterval(this.fundingRateAlertInterval);
+      this.fundingRateAlertInterval = null;
     }
     
     // 關閉數據庫連接
