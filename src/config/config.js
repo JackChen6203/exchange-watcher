@@ -18,8 +18,10 @@ const config = {
   // Discord Webhook
   discord: {
     webhookUrl: process.env.DISCORD_WEBHOOK_URL,
-<<<<<<< HEAD
-    positionWebhookUrl: process.env.DISCORD_POSITION_WEBHOOK_URL,
+    positionWebhookUrl: process.env.DISCORD_POSITION_WEBHOOK_URL || process.env.POSITION_WEBHOOK_URL,
+    fundingRateWebhookUrl: process.env.FUNDING_RATE_WEBHOOK_URL,
+    priceAlertWebhookUrl: process.env.PRICE_ALERT_WEBHOOK_URL,
+    swingStrategyWebhookUrl: process.env.SWING_STRATEGY_WEBHOOK_URL,
     // Discord 圖示配置
     icons: {
       chart: process.env.DISCORD_CHART_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4c8.png',
@@ -27,12 +29,6 @@ const config = {
       clock: process.env.DISCORD_CLOCK_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/23f0.png',
       settings: process.env.DISCORD_SETTINGS_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
     }
-=======
-    fundingRateWebhookUrl: process.env.FUNDING_RATE_WEBHOOK_URL,
-    positionWebhookUrl: process.env.POSITION_WEBHOOK_URL,
-    priceAlertWebhookUrl: process.env.PRICE_ALERT_WEBHOOK_URL,
-    swingStrategyWebhookUrl: process.env.SWING_STRATEGY_WEBHOOK_URL
->>>>>>> b2d1eebfdeadb136ecaf6be5732eac9f696e0be9
   },
   
   // 監控閾值

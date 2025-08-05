@@ -1,85 +1,25 @@
-# 🚀 加密貨幣交易所監控系統
+﻿# 🚀 加密貨幣交易所監控系統
 
 一個強大的 Bitget 交易所監控系統，支援持倉量監控、資金費率監控和實時 Discord 通知。
 
 ## ✨ 核心功能
 
-- 📊 **合約持倉量監控** - 實時監控開倉量變化並生成排行榜
-- 💰 **資金費率監控** - 跟蹤資金費率異動並發出警報  
-- 📈 **定時報告** - 每 15 分鐘自動生成排行榜報告
+- � **合約持倉量監控** - 實時監控開倉量變化並生成排行榜
+- 💰 **資金費率監控** - 跟蹤資金費率異動並發出警報
+- 📊 **定時報告** - 每 15 分鐘自動生成排行榜報告
 - 🔔 **Discord 通知** - 透過 Webhook 發送精美的監控結果
 - 💾 **數據持久化** - SQLite 數據庫存儲歷史數據
 - 🔄 **自動重連** - WebSocket 連接異常時自動重新連接
-- ⚙️ **完整日誌** - 詳細的日誌記錄系統
-
-## 🏗️ 部署方式
-
-當前專案使用 **systemd** 作為生產環境的進程管理器：
-- ✅ **主要部署**: systemd 服務 (推薦)
-- 🚀 **CI/CD 自動部署**: GitHub Actions 自動部署到 GCP
-- ⚠️ **已禁用**: PM2 部署 (ecosystem.config.js 僅供參考)
-- ⚠️ **已禁用**: Docker 部署 (需要服務器支持)
-
-## 🖥️ GCP VM 管理指南
-
-### 快速狀態檢查
-```bash
-# 下載並執行狀態檢查腳本
-cd /home/JackChen6203/exchange-watcher
-chmod +x scripts/check-status.sh
-./scripts/check-status.sh
-```
-
-### 服務管理命令
-```bash
-# 查看服務狀態
-sudo systemctl status crypto-monitor
-
-# 查看服務日誌
-sudo journalctl -u crypto-monitor -f
-
-# 重啟服務
-sudo systemctl restart crypto-monitor
-```
-
-詳細的管理指南請參考：[GCP VM 管理指南](docs/GCP-VM-管理指南.md)
+- � **完整日誌** - 詳細的日誌記錄系統
 
 ## 🛠️ 快速開始
 
 ### 1. 安裝依賴
 ```bash
-git clone https://github.com/JackChen6203/crypto-exchange-monitor.git
-cd crypto-exchange-monitor
+git clone https://github.com/JackChen6203/exchange-watcher.git
+cd exchange-watcher
 npm install
 ```
-
-### 2. 配置環境變數
-```bash
-cp .env.template .env
-# 編輯 .env 文件，填入你的API密鑰和配置
-```
-
-詳細的環境變數設置指南請參考：[環境變數設置指南](docs/環境變數設置指南.md)
-
-## ⚙️ 配置說明
-
-### 環境變數 (.env)
-
-```env
-# 交易所 API 配置
-API_KEY=your_bitget_api_key_here
-API_SECRET=your_bitget_api_secret_here
-API_PASSPHRASE=your_bitget_api_passphrase_here
-
-# Discord Webhook 配置
-DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
-FUNDING_RATE_WEBHOOK_URL=your_funding_rate_webhook_url_here
-POSITION_WEBHOOK_URL=your_position_webhook_url_here
-
-# 監控閾值
-PRICE_CHANGE_THRESHOLD=5      # 價格變動百分比閾值
-POSITION_CHANGE_THRESHOLD=1000 # 持倉變動金額閾值
-UPDATE_INTERVAL=5000          # 更新間隔(毫秒)
 
 ### 2. 配置環境變數
 ```bash
