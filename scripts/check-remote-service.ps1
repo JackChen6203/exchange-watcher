@@ -1,12 +1,12 @@
 # ==============================================
-# 遠端服務檢查PowerShell腳本
+# 遠端服務檢查PowerShell腳本 (不使用PM2)
 # ==============================================
 
 param(
     [string]$SSHHost = "gcp_jkes6204_new"
 )
 
-Write-Host "🔍 檢查遠端服務狀態..." -ForegroundColor Cyan
+Write-Host "🔍 檢查遠端服務狀態 (此專案不使用PM2)..." -ForegroundColor Cyan
 
 try {
     # 上傳檢查腳本到遠端
@@ -41,8 +41,9 @@ try {
     Write-Host "請檢查SSH配置和網路連接" -ForegroundColor Yellow
 }
 
-Write-Host "`n常用命令:" -ForegroundColor Cyan
+Write-Host "`n常用命令 (不使用PM2):" -ForegroundColor Cyan
 Write-Host "ssh $SSHHost" -ForegroundColor White
-Write-Host "ssh $SSHHost 'pm2 list'" -ForegroundColor White
-Write-Host "ssh $SSHHost 'pm2 logs crypto-exchange-monitor'" -ForegroundColor White
-Write-Host "ssh $SSHHost 'pm2 restart crypto-exchange-monitor'" -ForegroundColor White
+Write-Host "ssh $SSHHost 'ps aux | grep node | grep -v grep'" -ForegroundColor White
+Write-Host "ssh $SSHHost 'tail -f nohup.out'" -ForegroundColor White
+Write-Host "ssh $SSHHost 'tail -f logs/monitor.log'" -ForegroundColor White
+Write-Host "ssh $SSHHost 'pkill -f \"node.*crypto-exchange\"'" -ForegroundColor White

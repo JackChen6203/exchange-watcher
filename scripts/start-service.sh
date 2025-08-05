@@ -1,17 +1,35 @@
 #!/bin/bash
 
 # ==============================================
-# 啟動Exchange Monitor服務腳本
+# 啟動Exchange Monitor服務腳本 (不使用PM2)
 # ==============================================
 
-APP_DIR="/opt/crypto-exchange-monitor"
+# 檢查多個可能的應用程式位置
+APP_LOCATIONS=(
+    "/opt/crypto-exchange-monitor"
+    "~/crypto-exchange-monitor"
+    "./crypto-exchange-monitor"
+    "."
+)
+
 APP_NAME="crypto-exchange-monitor"
 
 echo "🚀 啟動Crypto Exchange Monitor服務..."
+echo "📋 注意: 此專案已停用PM2，使用直接Node.js運行"
+echo ""
 
-# 檢查目錄是否存在
-if [ ! -d "$APP_DIR" ]; then
-    echo "❌ 應用程式目錄不存在: $APP_DIR"
+# 尋找應用程式目錄
+APP_DIR=""
+for dir in "${APP_LOCATIONS[@]}"; do
+    if [ -d "$dir" ] && [ -f "$dir/package.json" ]; then
+        APP_DIR="$dir"
+        echo "✅ 找到應用程式目錄: $APP_DIR"
+        break
+    fi
+done
+
+if [ -z "$APP_DIR" ]; then
+    echo "❌ 找不到應用程式目錄"
     exit 1
 fi
 
@@ -39,30 +57,48 @@ fi
 echo "📦 安裝依賴..."
 npm install
 
-# 停止現有服務
-echo "🛑 停止現有PM2服務..."
-pm2 stop $APP_NAME 2>/dev/null || true
-pm2 delete $APP_NAME 2>/dev/null || true
+# 停止現有服務 (非PM2)
+echo "🛑 停止現有Node.js進程..."
+pkill -f "node.*crypto-exchange" || true
+pkill -f "node.*src/index.js" || true
 
-# 使用PM2啟動服務
-echo "🚀 使用PM2啟動服務..."
-pm2 start src/index.js --name "$APP_NAME" --log-date-format "YYYY-MM-DD HH:mm:ss Z"
+# 等待進程停止
+sleep 2
 
-# 保存PM2配置
-pm2 save
+# 使用nohup啟動服務在背景運行
+echo "🚀 使用nohup啟動服務..."
+nohup node src/index.js > nohup.out 2>&1 &
+SERVICE_PID=$!
 
-# 設置PM2開機自動啟動
-pm2 startup
+echo "✅ 服務已啟動，PID: $SERVICE_PID"
+echo "$SERVICE_PID" > crypto-exchange-monitor.pid
 
-echo "✅ 服務啟動完成！"
+# 檢查服務是否正常啟動
+sleep 3
+if ps -p $SERVICE_PID > /dev/null; then
+    echo "✅ 服務啟動成功！"
+else
+    echo "❌ 服務啟動失敗"
+    echo "檢查nohup.out日誌:"
+    tail -20 nohup.out
+    exit 1
+fi
+
 echo ""
 echo "📋 服務狀態:"
-pm2 list
+echo "PID: $SERVICE_PID"
+ps aux | grep $SERVICE_PID | grep -v grep
 
 echo ""
 echo "📝 查看日誌:"
-echo "pm2 logs $APP_NAME"
+echo "tail -f nohup.out"
+echo "tail -f logs/monitor.log"
 
 echo ""
-echo "🔍 檢查服務健康狀況:"
-echo "pm2 monit"
+echo "🔍 停止服務:"
+echo "kill $SERVICE_PID"
+echo "或使用: pkill -f 'node.*crypto-exchange'"
+
+echo ""
+echo "🔍 檢查服務狀態:"
+echo "ps aux | grep node | grep -v grep"
