@@ -2,6 +2,7 @@ const config = require('./config/config');
 const DiscordService = require('./services/discordService');
 const BitgetMonitor = require('./services/bitgetMonitor');
 const BitgetContractMonitor = require('./services/bitgetContractMonitor');
+const HealthServer = require('./server');
 const Logger = require('./utils/logger');
 
 class CryptoExchangeMonitor {
@@ -11,7 +12,9 @@ class CryptoExchangeMonitor {
     this.discordService = new DiscordService(config);
     this.bitgetMonitor = new BitgetMonitor(config, this.discordService);
     this.contractMonitor = new BitgetContractMonitor(config, this.discordService);
+    this.healthServer = new HealthServer(config, this);
     this.isRunning = false;
+    this.startTime = new Date().toISOString();
   }
 
   async start() {
@@ -26,6 +29,9 @@ class CryptoExchangeMonitor {
       // 暫時禁用現貨監控，專注於合約監控（持倉量和資金費率）
       // await this.bitgetMonitor.initialize();
       // await this.bitgetMonitor.connect();
+      
+      // 啟動健康檢查伺服器（Digital Ocean 部署需要）
+      this.healthServer.start();
       
       // 初始化合約監控（持倉量和資金費率）
       await this.contractMonitor.initialize();
@@ -94,6 +100,11 @@ class CryptoExchangeMonitor {
         
         if (this.contractMonitor) {
           this.contractMonitor.stop();
+        }
+        
+        // 停止健康檢查伺服器
+        if (this.healthServer) {
+          this.healthServer.stop();
         }
         
         // 發送關閉消息到Discord
