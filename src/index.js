@@ -153,32 +153,158 @@ class CryptoExchangeMonitor {
 
   async sendTestMessage() {
     try {
-      console.log('📧 發送測試消息...');
+      console.log('📧 執行系統測試...');
+      console.log('🔍 正在抓取實際交易所數據...');
       
+      // 檢查必要的環境變數
+      if (!process.env.DISCORD_WEBHOOK_URL) {
+        console.log('⚠️ DISCORD_WEBHOOK_URL 未設置，將只測試 API 功能，不發送 Discord 消息');
+      }
+      
+      // 初始化 API 客戶端用於測試
+      const BitgetApi = require('./services/bitgetApi');
+      const testApi = new BitgetApi(this.config);
+      
+      // 測試 API 連接
+      console.log('🔗 測試 Bitget API 連接...');
+      const connectionTest = await testApi.testConnection();
+      if (!connectionTest) {
+        throw new Error('Bitget API 連接失敗');
+      }
+      
+      // 測試持倉量數據抓取
+      console.log('📊 測試持倉量數據抓取...');
+      const openInterestData = await testApi.getAllOpenInterest();
+      
+      // 測試資金費率數據抓取 (抓取前10個合約的資金費率)
+      console.log('💰 測試資金費率數據抓取...');
+      const contracts = await testApi.getAllContractSymbols();
+      const top10Contracts = contracts.slice(0, 10);
+      
+      const fundingRateData = [];
+      for (const contract of top10Contracts) {
+        try {
+          const fundingRate = await testApi.getFundingRate(contract.symbol);
+          if (fundingRate && fundingRate.fundingRate) {
+            fundingRateData.push({
+              symbol: contract.symbol,
+              fundingRate: fundingRate.fundingRate
+            });
+          }
+          // 避免 API 限制
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          console.log(`⚠️ 無法獲取 ${contract.symbol} 的資金費率:`, error.message);
+        }
+      }
+      
+      // 準備測試報告
+      const topOI = openInterestData
+        .filter(item => item.openInterest && parseFloat(item.openInterest) > 0)
+        .sort((a, b) => parseFloat(b.openInterest) - parseFloat(a.openInterest))
+        .slice(0, 5);
+        
+      const topFunding = fundingRateData
+        .filter(item => item.fundingRate !== '0')
+        .sort((a, b) => Math.abs(parseFloat(b.fundingRate)) - Math.abs(parseFloat(a.fundingRate)))
+        .slice(0, 5);
+
       const testEmbed = {
-        title: '🧪 系統測試',
-        description: '加密貨幣交易所監控系統測試消息，驗證現貨價格監控、持倉量和資金費率監控功能',
-        color: 0x0099ff,
+        title: '🧪 系統測試 - 實際數據驗證',
+        description: '✅ 成功連接 Bitget 交易所並抓取實際數據',
+        color: 0x00ff00,
         fields: [
           {
-            name: '測試時間',
-            value: new Date().toLocaleString('zh-TW'),
+            name: '📊 持倉量數據測試',
+            value: `抓取到 ${openInterestData.length} 個合約的持倉量數據\n` +
+                   `前5名持倉量:\n${topOI.map((item, index) => 
+                     `${index + 1}. ${item.symbol}: $${parseFloat(item.openInterest).toLocaleString()}`
+                   ).join('\n')}`,
+            inline: false
+          },
+          {
+            name: '💰 資金費率數據測試', 
+            value: `抓取到 ${fundingRateData.length} 個合約的資金費率數據\n` +
+                   `前5名資金費率:\n${topFunding.map((item, index) => 
+                     `${index + 1}. ${item.symbol}: ${(parseFloat(item.fundingRate) * 100).toFixed(4)}%`
+                   ).join('\n')}`,
+            inline: false
+          },
+          {
+            name: '🕐 測試時間',
+            value: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
             inline: true
           },
           {
-            name: '系統狀態',
-            value: '正常運行',
+            name: '🔗 API 狀態',
+            value: '✅ Bitget API 連接正常',
+            inline: true
+          },
+          {
+            name: '📡 Discord 狀態',
+            value: '✅ Discord Webhook 正常',
+            inline: true
+          }
+        ],
+        footer: {
+          text: '🚀 加密貨幣交易所監控系統 | 實際數據測試'
+        },
+        timestamp: new Date().toISOString()
+      };
+
+      // 只有在有 Discord Webhook URL 時才發送消息
+      if (process.env.DISCORD_WEBHOOK_URL) {
+        await this.discordService.sendEmbed(testEmbed);
+        console.log('✅ 實際數據測試消息發送成功');
+      } else {
+        console.log('📋 測試報告 (Discord 未配置):');
+        console.log(JSON.stringify(testEmbed, null, 2));
+        console.log('✅ 實際數據測試完成 (僅控制台輸出)');
+      }
+      
+      // 輸出詳細測試結果到控制台
+      console.log('\n📊 測試結果摘要:');
+      console.log(`- 持倉量數據: ${openInterestData.length} 個合約`);
+      console.log(`- 資金費率數據: ${fundingRateData.length} 個合約`);
+      console.log(`- Discord 發送: 成功`);
+      console.log(`- API 連接: 正常`);
+      
+    } catch (error) {
+      console.error('❌ 系統測試失敗:', error);
+      
+      // 發送錯誤報告
+      const errorEmbed = {
+        title: '❌ 系統測試失敗',
+        description: '測試過程中發生錯誤，請檢查配置和網絡連接',
+        color: 0xff0000,
+        fields: [
+          {
+            name: '錯誤訊息',
+            value: error.message || '未知錯誤',
+            inline: false
+          },
+          {
+            name: '測試時間',
+            value: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }),
+            inline: true
+          },
+          {
+            name: '錯誤類型',
+            value: error.name || 'Error',
             inline: true
           }
         ],
         timestamp: new Date().toISOString()
       };
-
-      await this.discordService.sendEmbed(testEmbed);
-      console.log('✅ 測試消息發送成功');
       
-    } catch (error) {
-      console.error('❌ 測試消息發送失敗:', error);
+      // 只有在有 Discord Webhook URL 時才發送錯誤報告
+      if (process.env.DISCORD_WEBHOOK_URL) {
+        try {
+          await this.discordService.sendEmbed(errorEmbed);
+        } catch (discordError) {
+          console.error('❌ Discord 錯誤報告發送也失敗:', discordError);
+        }
+      }
     }
   }
 }

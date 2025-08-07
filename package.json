@@ -16,6 +16,7 @@
     "test:all": "npm run test && npm run test:enhanced && npm run test:e2e && npm run test:contract && npm run test:comprehensive",
     "test-discord": "node src/index.js --test",
     "test-enhanced": "node src/enhancedIndex.js --test",
+    "test:realdata": "node test_realdata.js",
     "system-test": "node test/systemTest.js",
     "lint": "echo 'Code style check passed'",
     "build": "echo 'Build step completed - Node.js project ready'",
