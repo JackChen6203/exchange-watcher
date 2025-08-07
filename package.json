@@ -22,6 +22,7 @@
     "build": "echo 'Build step completed - Node.js project ready'",
     "deploy": "echo 'Ready for deployment'",
     "deploy:direct": "bash deploy/direct-deploy.sh",
+    "deploy:test": "bash scripts/post-deploy-test.sh",
     "setup:vm": "bash deploy/vm-setup.sh"
   },
   "dependencies": {

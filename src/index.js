@@ -42,6 +42,19 @@ class CryptoExchangeMonitor {
       this.isRunning = true;
       this.logger.console('✅ 監控系統啟動成功');
       
+      // 部署後自動執行測試 (僅在生產環境且首次啟動時)
+      if (process.env.NODE_ENV === 'production' && !process.env.SKIP_DEPLOY_TEST) {
+        this.logger.console('🧪 執行部署後自動測試...');
+        setTimeout(async () => {
+          try {
+            await this.sendTestMessage();
+            this.logger.console('✅ 部署後測試完成');
+          } catch (error) {
+            this.logger.error('❌ 部署後測試失敗:', error);
+          }
+        }, 10000); // 等待10秒讓系統穩定
+      }
+      
       // 設置優雅關閉
       this.setupGracefulShutdown();
       

@@ -39,3 +39,5 @@ services:
     type: SECRET
   - key: TZ
     value: Asia/Taipei
+  - key: SKIP_DEPLOY_TEST
+    value: "false"
