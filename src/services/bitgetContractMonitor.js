@@ -14,8 +14,19 @@ class BitgetContractMonitor {
     // 持倉量數據存儲 (支持多個時間週期)
     this.openInterests = {
       current: new Map(),   // 當前數據
+      '5m': new Map(),      // 5分鐘前
       '15m': new Map(),     // 15分鐘前
       '1h': new Map(),      // 1小時前  
+      '4h': new Map(),      // 4小時前
+      '1d': new Map()       // 1天前
+    };
+    
+    // 價格數據存儲 (支持多個時間週期)
+    this.priceData = {
+      current: new Map(),   // 當前價格數據
+      '5m': new Map(),      // 5分鐘前
+      '15m': new Map(),     // 15分鐘前
+      '1h': new Map(),      // 1小時前
       '4h': new Map(),      // 4小時前
       '1d': new Map()       // 1天前
     };
@@ -153,12 +164,24 @@ class BitgetContractMonitor {
   }
 
   startPeriodicReporting() {
-    // 每15分鐘發送一次報告
-    this.reportingInterval = setInterval(async () => {
-      await this.generateAndSendReport();
-    }, 15 * 60 * 1000); // 15分鐘
+    // 每5分鐘發送持倉異動和價格異動報告
+    this.positionPriceReportInterval = setInterval(async () => {
+      await this.generateAndSendPositionPriceReport();
+    }, 5 * 60 * 1000); // 5分鐘
     
-    this.logger.info('📊 啟動定期報告 (每15分鐘發送持倉異動和資金費率排行)');
+    // 每小時50分、55分、59分發送資金費率報告
+    this.fundingRateReportInterval = setInterval(async () => {
+      const now = new Date();
+      const minutes = now.getMinutes();
+      
+      if (minutes === 50 || minutes === 55 || minutes === 59) {
+        await this.generateAndSendFundingRateReport();
+      }
+    }, 60 * 1000); // 每分鐘檢查一次
+    
+    this.logger.info('📊 啟動定期報告:');
+    this.logger.info('   - 持倉/價格異動: 每5分鐘');
+    this.logger.info('   - 資金費率: 每小時50、55、59分');
   }
 
   async updateContractData() {
@@ -168,13 +191,16 @@ class BitgetContractMonitor {
       // 備份歷史數據
       this.backupHistoricalData();
       
-      // 獲取最新開倉量數據
+      // 獲取最新持倉量數據
       const openInterestData = await this.bitgetApi.getAllOpenInterest('umcbl');
       
-      // 更新當前開倉量數據
+      // 更新當前持倉量數據
       openInterestData.forEach(data => {
         this.openInterests.current.set(data.symbol, data);
       });
+      
+      // 獲取價格數據 (分批處理避免API限制)
+      await this.updatePriceData();
       
       // 更新資金費率數據 (分批處理)
       const activeSylmbols = Array.from(this.openInterests.current.keys()).slice(0, 50); // 只更新前50個活躍合約
@@ -203,28 +229,73 @@ class BitgetContractMonitor {
     }
   }
 
+  async updatePriceData() {
+    try {
+      const symbols = Array.from(this.openInterests.current.keys());
+      const batchSize = 10; // 每批處理10個合約
+      
+      for (let i = 0; i < Math.min(symbols.length, 50); i += batchSize) { // 只處理前50個活躍合約
+        const batch = symbols.slice(i, i + batchSize);
+        
+        const pricePromises = batch.map(async (symbol) => {
+          try {
+            const ticker = await this.bitgetApi.getSymbolTicker(symbol);
+            this.priceData.current.set(symbol, {
+              symbol: ticker.symbol,
+              lastPrice: ticker.lastPrice,
+              change24h: ticker.change24h,
+              changePercent24h: ticker.changePercent24h,
+              timestamp: ticker.timestamp
+            });
+          } catch (error) {
+            this.logger.debug(`⚠️ 無法獲取${symbol}價格:`, error.message);
+          }
+        });
+        
+        await Promise.all(pricePromises);
+        // 避免API限制，每批之間暫停
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      this.logger.debug(`💰 更新價格數據完成: ${this.priceData.current.size}個合約`);
+      
+    } catch (error) {
+      this.logger.error('❌ 更新價格數據失敗:', error);
+    }
+  }
+
   backupHistoricalData() {
     const now = Date.now();
-    const currentData = this.openInterests.current;
+    const currentOIData = this.openInterests.current;
+    const currentPriceData = this.priceData.current;
     
     // 檢查是否需要備份到各個時間點
+    if (this.shouldBackup('5m', now)) {
+      this.openInterests['5m'] = new Map(currentOIData);
+      this.priceData['5m'] = new Map(currentPriceData);
+    }
     if (this.shouldBackup('15m', now)) {
-      this.openInterests['15m'] = new Map(currentData);
+      this.openInterests['15m'] = new Map(currentOIData);
+      this.priceData['15m'] = new Map(currentPriceData);
     }
     if (this.shouldBackup('1h', now)) {
-      this.openInterests['1h'] = new Map(currentData);
+      this.openInterests['1h'] = new Map(currentOIData);
+      this.priceData['1h'] = new Map(currentPriceData);
     }
     if (this.shouldBackup('4h', now)) {
-      this.openInterests['4h'] = new Map(currentData);
+      this.openInterests['4h'] = new Map(currentOIData);
+      this.priceData['4h'] = new Map(currentPriceData);
     }
     if (this.shouldBackup('1d', now)) {
-      this.openInterests['1d'] = new Map(currentData);
+      this.openInterests['1d'] = new Map(currentOIData);
+      this.priceData['1d'] = new Map(currentPriceData);
     }
   }
 
   shouldBackup(period, now) {
     // 簡化的備份邏輯，實際應該基於精確的時間間隔
     const intervals = {
+      '5m': 5 * 60 * 1000,
       '15m': 15 * 60 * 1000,
       '1h': 60 * 60 * 1000,
       '4h': 4 * 60 * 60 * 1000,
@@ -243,25 +314,115 @@ class BitgetContractMonitor {
     return false;
   }
 
-  async generateAndSendReport() {
+  async generateAndSendPositionPriceReport() {
     try {
-      this.logger.info('📊 生成持倉異動和資金費率排行報告...');
+      this.logger.info('📊 生成持倉異動和價格變動排行報告...');
       
-      // 生成持倉異動排行
-      const positionChanges = this.calculatePositionChanges();
+      // 生成綜合數據分析
+      const analysisData = this.calculateCombinedAnalysis();
+      
+      if (analysisData.size === 0) {
+        this.logger.info('⚠️ 暫無足夠數據生成報告');
+        return;
+      }
+      
+      // 發送持倉異動排行表格 (正異動和負異動各8個)
+      await this.sendPositionChangeTable(analysisData);
+      
+      // 間隔發送
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // 發送價格異動排行表格 (正異動和負異動各8個)
+      await this.sendPriceChangeTable(analysisData);
+      
+      this.logger.info('✅ 持倉/價格異動報告發送完成');
+      
+    } catch (error) {
+      this.logger.error('❌ 生成持倉/價格異動報告失敗:', error);
+    }
+  }
+
+  async generateAndSendFundingRateReport() {
+    try {
+      this.logger.info('💰 生成資金費率排行報告...');
       
       // 生成資金費率排行
       const fundingRateRankings = this.calculateFundingRateRankings();
       
-      // 發送Discord報告
-      await this.sendPositionChangeReport(positionChanges);
+      if (fundingRateRankings.positive.length === 0 && fundingRateRankings.negative.length === 0) {
+        this.logger.info('⚠️ 暫無資金費率數據');
+        return;
+      }
+      
+      // 發送資金費率報告
       await this.sendFundingRateReport(fundingRateRankings);
       
-      this.logger.info('✅ 報告發送完成');
+      this.logger.info('✅ 資金費率報告發送完成');
       
     } catch (error) {
-      this.logger.error('❌ 生成報告失敗:', error);
+      this.logger.error('❌ 生成資金費率報告失敗:', error);
     }
+  }
+
+  calculateCombinedAnalysis() {
+    const periods = ['5m', '15m', '1h', '4h'];
+    const analysis = new Map();
+    
+    // 獲取所有有數據的交易對
+    const allSymbols = new Set([
+      ...this.openInterests.current.keys(),
+      ...this.priceData.current.keys()
+    ]);
+    
+    allSymbols.forEach(symbol => {
+      const symbolData = {
+        symbol,
+        positionChanges: {},
+        priceChanges: {},
+        currentPrice: 0,
+        currentPosition: 0
+      };
+      
+      // 獲取當前價格和持倉量
+      const currentPrice = this.priceData.current.get(symbol);
+      const currentPosition = this.openInterests.current.get(symbol);
+      
+      if (currentPrice) symbolData.currentPrice = currentPrice.lastPrice;
+      if (currentPosition) symbolData.currentPosition = currentPosition.openInterestUsd;
+      
+      // 計算各時間周期的變化
+      periods.forEach(period => {
+        // 持倉量變化
+        const historicalPosition = this.openInterests[period]?.get(symbol);
+        if (historicalPosition && currentPosition) {
+          const posChange = currentPosition.openInterestUsd - historicalPosition.openInterestUsd;
+          const posChangePercent = (posChange / historicalPosition.openInterestUsd) * 100;
+          symbolData.positionChanges[period] = {
+            absolute: posChange,
+            percent: posChangePercent
+          };
+        }
+        
+        // 價格變化  
+        const historicalPrice = this.priceData[period]?.get(symbol);
+        if (historicalPrice && currentPrice) {
+          const priceChange = currentPrice.lastPrice - historicalPrice.lastPrice;
+          const priceChangePercent = (priceChange / historicalPrice.lastPrice) * 100;
+          symbolData.priceChanges[period] = {
+            absolute: priceChange,
+            percent: priceChangePercent
+          };
+        }
+      });
+      
+      // 只保存有變化數據的交易對
+      if (Object.keys(symbolData.positionChanges).length > 0 || 
+          Object.keys(symbolData.priceChanges).length > 0) {
+        analysis.set(symbol, symbolData);
+      }
+    });
+    
+    return analysis;
   }
 
   calculatePositionChanges() {
@@ -612,9 +773,14 @@ ${combinedRows.join('\n')}
       this.monitoringInterval = null;
     }
     
-    if (this.reportingInterval) {
-      clearInterval(this.reportingInterval);
-      this.reportingInterval = null;
+    if (this.positionPriceReportInterval) {
+      clearInterval(this.positionPriceReportInterval);
+      this.positionPriceReportInterval = null;
+    }
+    
+    if (this.fundingRateReportInterval) {
+      clearInterval(this.fundingRateReportInterval);
+      this.fundingRateReportInterval = null;
     }
     
     if (this.fundingRateAlertInterval) {
@@ -628,6 +794,133 @@ ${combinedRows.join('\n')}
     }
     
     this.logger.info('⏹️ 合約監控系統已停止');
+  }
+
+  async sendPositionChangeTable(analysisData) {
+    try {
+      // 獲取所有有持倉變化的數據，按15分鐘持倉變化排序
+      const dataArray = Array.from(analysisData.values())
+        .filter(item => item.positionChanges['15m'])
+        .sort((a, b) => Math.abs(b.positionChanges['15m'].percent) - Math.abs(a.positionChanges['15m'].percent));
+      
+      if (dataArray.length === 0) {
+        this.logger.info('⚠️ 無持倉變化數據');
+        return;
+      }
+      
+      // 分離正負異動
+      const positiveChanges = dataArray
+        .filter(item => item.positionChanges['15m'].percent > 0)
+        .slice(0, 8);
+      
+      const negativeChanges = dataArray
+        .filter(item => item.positionChanges['15m'].percent < 0)
+        .slice(0, 8);
+      
+      // 發送正異動表格
+      if (positiveChanges.length > 0) {
+        await this.sendPositionTable('正異動', positiveChanges);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      // 發送負異動表格
+      if (negativeChanges.length > 0) {
+        await this.sendPositionTable('負異動', negativeChanges);
+      }
+      
+    } catch (error) {
+      this.logger.error('❌ 發送持倉異動表格失敗:', error);
+    }
+  }
+
+  async sendPriceChangeTable(analysisData) {
+    try {
+      // 獲取所有有價格變化的數據，按15分鐘價格變化排序
+      const dataArray = Array.from(analysisData.values())
+        .filter(item => item.priceChanges['15m'])
+        .sort((a, b) => Math.abs(b.priceChanges['15m'].percent) - Math.abs(a.priceChanges['15m'].percent));
+      
+      if (dataArray.length === 0) {
+        this.logger.info('⚠️ 無價格變化數據');
+        return;
+      }
+      
+      // 分離正負異動
+      const positiveChanges = dataArray
+        .filter(item => item.priceChanges['15m'].percent > 0)
+        .slice(0, 8);
+      
+      const negativeChanges = dataArray
+        .filter(item => item.priceChanges['15m'].percent < 0)
+        .slice(0, 8);
+      
+      // 發送正異動表格
+      if (positiveChanges.length > 0) {
+        await this.sendPriceTable('正異動', positiveChanges);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      // 發送負異動表格
+      if (negativeChanges.length > 0) {
+        await this.sendPriceTable('負異動', negativeChanges);
+      }
+      
+    } catch (error) {
+      this.logger.error('❌ 發送價格異動表格失敗:', error);
+    }
+  }
+
+  async sendPositionTable(type, data) {
+    // 持倉異動表格標頭：幣種 | 價格異動 | 5分持倉異動 | 15分持倉異動 | 1h持倉異動 | 4h持倉異動
+    const tableRows = data.map((item, index) => {
+      const symbol = item.symbol.padEnd(12);
+      const priceChange = this.formatPercent(item.priceChanges['15m']?.percent || 0).padStart(8);
+      const pos5m = this.formatPercent(item.positionChanges['5m']?.percent || 0).padStart(8);
+      const pos15m = this.formatPercent(item.positionChanges['15m']?.percent || 0).padStart(8);
+      const pos1h = this.formatPercent(item.positionChanges['1h']?.percent || 0).padStart(8);
+      const pos4h = this.formatPercent(item.positionChanges['4h']?.percent || 0).padStart(8);
+      
+      return `${(index + 1).toString().padStart(2)} | ${symbol} | ${priceChange} | ${pos5m} | ${pos15m} | ${pos1h} | ${pos4h}`;
+    }).join('\n');
+
+    const tableContent = `\`\`\`
+📊 持倉異動排行 ${type} TOP8 (各時間周期對比)
+
+排名 | 幣種          | 價格異動  | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉
+-----|-------------|----------|----------|----------|----------|----------
+${tableRows}
+\`\`\``;
+
+    await this.discordService.sendMessage(tableContent);
+  }
+
+  async sendPriceTable(type, data) {
+    // 價格異動表格標頭：幣種 | 持倉異動 | 5分價格異動 | 15分價格異動 | 1h價格異動 | 4h價格異動
+    const tableRows = data.map((item, index) => {
+      const symbol = item.symbol.padEnd(12);
+      const posChange = this.formatPercent(item.positionChanges['15m']?.percent || 0).padStart(8);
+      const price5m = this.formatPercent(item.priceChanges['5m']?.percent || 0).padStart(8);
+      const price15m = this.formatPercent(item.priceChanges['15m']?.percent || 0).padStart(8);
+      const price1h = this.formatPercent(item.priceChanges['1h']?.percent || 0).padStart(8);
+      const price4h = this.formatPercent(item.priceChanges['4h']?.percent || 0).padStart(8);
+      
+      return `${(index + 1).toString().padStart(2)} | ${symbol} | ${posChange} | ${price5m} | ${price15m} | ${price1h} | ${price4h}`;
+    }).join('\n');
+
+    const tableContent = `\`\`\`
+💰 價格異動排行 ${type} TOP8 (各時間周期對比)
+
+排名 | 幣種          | 持倉異動  | 5分價格  | 15分價格 | 1h價格   | 4h價格
+-----|-------------|----------|----------|----------|----------|----------
+${tableRows}
+\`\`\``;
+
+    await this.discordService.sendMessage(tableContent);
+  }
+
+  formatPercent(value) {
+    if (!value || isNaN(value)) return '0.00%';
+    return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
   }
 
   getStatus() {
