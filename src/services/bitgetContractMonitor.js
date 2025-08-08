@@ -871,49 +871,67 @@ ${combinedRows.join('\n')}
   }
 
   async sendPositionTable(type, data) {
-    // 持倉異動表格標頭：幣種 | 價格異動 | 5分持倉異動 | 15分持倉異動 | 1h持倉異動 | 4h持倉異動
+    // 持倉異動表格標頭：幣種 | 價格異動 | 總市值 | 15分持倉 | 1h持倉 | 4h持倉
     const tableRows = data.map((item, index) => {
       const symbol = item.symbol.padEnd(12);
       const priceChange = this.formatPercent(item.priceChanges['15m']?.percent || 0).padStart(8);
-      const pos5m = this.formatPercent(item.positionChanges['5m']?.percent || 0).padStart(8);
-      const pos15m = this.formatPercent(item.positionChanges['15m']?.percent || 0).padStart(8);
-      const pos1h = this.formatPercent(item.positionChanges['1h']?.percent || 0).padStart(8);
-      const pos4h = this.formatPercent(item.positionChanges['4h']?.percent || 0).padStart(8);
+      const marketCap = '   0.00%'.padStart(8); // 總市值暫時顯示為0.00%
+      const pos15m = this.formatPercent(item.positionChanges['15m']?.percent || 0).padStart(9);
+      const pos1h = this.formatPercent(item.positionChanges['1h']?.percent || 0).padStart(9);
+      const pos4h = this.formatPercent(item.positionChanges['4h']?.percent || 0).padStart(9);
       
-      return `${(index + 1).toString().padStart(2)} | ${symbol} | ${priceChange} | ${pos5m} | ${pos15m} | ${pos1h} | ${pos4h}`;
+      return `  ${(index + 1).toString().padStart(1)} | ${symbol} | ${priceChange} | ${marketCap} | ${pos15m} | ${pos1h} | ${pos4h}`;
     }).join('\n');
+
+    // 獲取北京時間
+    const beijingTime = new Date().toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
 
     const tableContent = `\`\`\`
 📊 持倉異動排行 ${type} TOP8 (各時間周期對比)
 
-排名 | 幣種          | 價格異動  | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉
+排名 | 幣種          | 價格異動  | 總市值  | 15分持倉 | 1h持倉   | 4h持倉
 -----|-------------|----------|----------|----------|----------|----------
 ${tableRows}
-\`\`\``;
+\`\`\`
+[${beijingTime.includes('上午') ? '上午' : '下午'}${beijingTime.replace(/上午|下午/, '')}]`;
 
     await this.discordService.sendMessage(tableContent);
   }
 
   async sendPriceTable(type, data) {
-    // 價格異動表格標頭：幣種 | 持倉異動 | 5分價格異動 | 15分價格異動 | 1h價格異動 | 4h價格異動
+    // 價格異動表格標頭：幣種 | 持倉異動 | 總市值 | 15分價格 | 1h價格 | 4h價格
     const tableRows = data.map((item, index) => {
       const symbol = item.symbol.padEnd(12);
       const posChange = this.formatPercent(item.positionChanges['15m']?.percent || 0).padStart(8);
-      const price5m = this.formatPercent(item.priceChanges['5m']?.percent || 0).padStart(8);
-      const price15m = this.formatPercent(item.priceChanges['15m']?.percent || 0).padStart(8);
-      const price1h = this.formatPercent(item.priceChanges['1h']?.percent || 0).padStart(8);
-      const price4h = this.formatPercent(item.priceChanges['4h']?.percent || 0).padStart(8);
+      const marketCap = '   0.00%'.padStart(8); // 總市值暫時顯示為0.00%
+      const price15m = this.formatPercent(item.priceChanges['15m']?.percent || 0).padStart(9);
+      const price1h = this.formatPercent(item.priceChanges['1h']?.percent || 0).padStart(9);
+      const price4h = this.formatPercent(item.priceChanges['4h']?.percent || 0).padStart(9);
       
-      return `${(index + 1).toString().padStart(2)} | ${symbol} | ${posChange} | ${price5m} | ${price15m} | ${price1h} | ${price4h}`;
+      return `  ${(index + 1).toString().padStart(1)} | ${symbol} | ${posChange} | ${marketCap} | ${price15m} | ${price1h} | ${price4h}`;
     }).join('\n');
+
+    // 獲取北京時間
+    const beijingTime = new Date().toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
 
     const tableContent = `\`\`\`
 💰 價格異動排行 ${type} TOP8 (各時間周期對比)
 
-排名 | 幣種          | 持倉異動  | 5分價格  | 15分價格 | 1h價格   | 4h價格
+排名 | 幣種          | 持倉異動  | 總市值  | 15分價格 | 1h價格   | 4h價格
 -----|-------------|----------|----------|----------|----------|----------
 ${tableRows}
-\`\`\``;
+\`\`\`
+[${beijingTime.includes('上午') ? '上午' : '下午'}${beijingTime.replace(/上午|下午/, '')}]`;
 
     await this.discordService.sendMessage(tableContent);
   }
