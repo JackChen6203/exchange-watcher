@@ -422,27 +422,35 @@ class EnhancedContractMonitor {
     try {
       const currentPrices = this.priceData.current;
       const threshold = this.config.thresholds.priceChange;
+      let alertCount = 0;
+      
+      this.logger.debug(`🔍 監控價格變動 - 閾值: ${threshold}%, 當前價格數據: ${currentPrices.size} 個`);
       
       for (const [symbol, currentPrice] of currentPrices) {
         // 檢查各個時間週期的價格變動
         const periods = ['15m', '30m', '1h', '4h'];
         const priceChanges = {};
         let hasSignificantChange = false;
+        let maxChange = 0;
         
         for (const period of periods) {
           const historicalPrice = this.priceData[period]?.get(symbol);
           if (historicalPrice) {
             const change = ((currentPrice.price - historicalPrice.price) / historicalPrice.price) * 100;
             priceChanges[period] = change;
+            maxChange = Math.max(maxChange, Math.abs(change));
             
             if (Math.abs(change) > threshold) {
               hasSignificantChange = true;
+              this.logger.debug(`📈 ${symbol} ${period} 變動 ${change.toFixed(2)}% 超過閾值`);
             }
           }
         }
         
         // 如果有顯著價格變動，發送警報
         if (hasSignificantChange) {
+          this.logger.info(`🚨 發送價格警報: ${symbol} 最大變動 ${maxChange.toFixed(2)}%`);
+          
           await this.discordService.sendAlert('price_alert', {
             symbol,
             price: currentPrice.price,
@@ -450,10 +458,56 @@ class EnhancedContractMonitor {
             volume24h: currentPrice.volume,
             priceChanges
           });
+          
+          alertCount++;
         }
       }
+      
+      if (alertCount > 0) {
+        this.logger.info(`✅ 價格監控完成 - 發送了 ${alertCount} 個警報`);
+      } else {
+        this.logger.debug(`📊 價格監控完成 - 無超過閾值的變動`);
+      }
+      
     } catch (error) {
       this.logger.error('❌ 監控價格變動失敗:', error);
+    }
+  }
+
+  // 手動觸發價格警報測試 (用於測試功能)
+  async testPriceAlert() {
+    try {
+      this.logger.info('🧪 手動觸發價格警報測試...');
+      
+      const testSymbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+      
+      for (const symbol of testSymbols) {
+        const currentPrice = this.priceData.current.get(symbol);
+        if (currentPrice) {
+          // 模擬顯著價格變動
+          const testAlert = {
+            symbol,
+            price: currentPrice.price,
+            changePercent: Math.random() > 0.5 ? 5.2 : -4.8, // 隨機正負變動
+            volume24h: currentPrice.volume || 1000000,
+            priceChanges: {
+              '15m': (Math.random() - 0.5) * 2,
+              '30m': (Math.random() - 0.5) * 4,
+              '1h': (Math.random() - 0.5) * 6,
+              '4h': (Math.random() - 0.5) * 8
+            }
+          };
+          
+          await this.discordService.sendAlert('price_alert', testAlert);
+          this.logger.info(`✅ 測試警報已發送: ${symbol} ${testAlert.changePercent}%`);
+          
+          // 避免頻率限制
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+    } catch (error) {
+      this.logger.error('❌ 測試價格警報失敗:', error);
     }
   }
 

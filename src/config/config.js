@@ -33,7 +33,7 @@ const config = {
   
   // 監控閾值
   thresholds: {
-    priceChange: parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 10, // 價格變動百分比(改為10%)
+    priceChange: parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 3, // 價格變動百分比(改為3%，更容易觸發)
     positionChange: parseFloat(process.env.POSITION_CHANGE_THRESHOLD) || 10, // 持倉變動百分比(改為10%)
     fundingRateHigh: parseFloat(process.env.FUNDING_RATE_HIGH_THRESHOLD) || 0.1, // 資金費率異常高閾值(0.1%)
     fundingRateLow: parseFloat(process.env.FUNDING_RATE_LOW_THRESHOLD) || -0.1, // 資金費率異常低閾值(-0.1%)

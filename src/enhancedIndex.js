@@ -224,6 +224,13 @@ class EnhancedCryptoExchangeMonitor {
           this.logger.console('📈 生成實際數據報告...');
           await this.contractMonitor.generateAndSendReport();
           this.logger.console('✅ 實際數據報告已發送到Discord');
+          
+          // 測試價格警報功能
+          if (status.priceData > 0) {
+            this.logger.console('🧪 測試價格警報功能...');
+            await this.contractMonitor.testPriceAlert();
+            this.logger.console('✅ 價格警報測試完成');
+          }
         } else {
           this.logger.warn('⚠️ 未收集到實際數據，可能是API配置問題');
         }
