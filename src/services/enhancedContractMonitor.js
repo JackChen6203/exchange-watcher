@@ -407,12 +407,26 @@ class EnhancedContractMonitor {
             
             // 只記錄有意義的持倉量變動 (大於1%或金額超過$10,000)
             if (Math.abs(changePercent) > 1 || Math.abs(change) > 10000) {
+              // 獲取當前價格數據和市值
+              const currentPrice = this.priceData.current.get(symbol);
+              const historicalPrice = this.priceData[period]?.get(symbol);
+              
+              let priceChange = 0;
+              if (historicalPrice && historicalPrice.price > 0) {
+                priceChange = ((currentPrice?.price - historicalPrice.price) / historicalPrice.price) * 100;
+              }
+              
+              // 獲取24h交易額作為市值指標
+              const marketCap = currentPrice?.volume || 0;
+              
               changes.push({
                 symbol,
                 currentOpenInterest: current.openInterestUsd,
                 previousOpenInterest: historical.openInterestUsd,
                 change,
                 changePercent,
+                priceChange: priceChange || 0,
+                marketCap: marketCap || 0,
                 timestamp: Date.now()
               });
             }

@@ -533,21 +533,42 @@ class EnhancedDiscordService {
     
     // 生成正異動表格
     let positiveTable = '```\n📊 持倉異動排行 正異動 TOP8 (各時間周期對比)\n\n';
-    positiveTable += '排名 | 幣種          | 價格異動  | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉\n';
-    positiveTable += '-----|-------------|----------|----------|----------|----------|----------\n';
+    positiveTable += '排名 | 幣種          | 價格異動 | 總市值($)   | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉\n';
+    positiveTable += '-----|-------------|----------|-------------|----------|----------|----------|----------\n';
     
     positiveChanges.forEach((item, index) => {
       const rank = String(index + 1).padStart(2);
       const symbolPadded = item.symbol.padEnd(12);
       
-      // 計算價格異動 (使用15分鐘週期作為參考)
+      // 從實時數據獲取價格異動和總市值
       let priceChange = '   0.00%';
-      if (priceData && priceData.current && priceData['15m']) {
-        const currentPrice = priceData.current.get(item.symbol);
-        const historicalPrice = priceData['15m'].get(item.symbol);
-        if (currentPrice && historicalPrice && historicalPrice.price > 0) {
-          const change = ((currentPrice.price - historicalPrice.price) / historicalPrice.price) * 100;
-          priceChange = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`.padStart(8);
+      let marketCap = '    0';
+      
+      // 使用真實的持倉數據計算價格異動
+      if (changes['15m'] && changes['15m'].positive) {
+        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
+        if (match && match.priceChange !== undefined) {
+          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
+        }
+      }
+      if (changes['15m'] && changes['15m'].negative) {
+        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
+        if (match && match.priceChange !== undefined) {
+          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
+        }
+      }
+      
+      // 獲取總市值（使用24h交易額作為指標）
+      if (changes['15m'] && changes['15m'].positive) {
+        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
+        if (match && match.marketCap) {
+          marketCap = this.formatNumber(match.marketCap).padStart(11);
+        }
+      }
+      if (changes['15m'] && changes['15m'].negative) {
+        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
+        if (match && match.marketCap) {
+          marketCap = this.formatNumber(match.marketCap).padStart(11);
         }
       }
       
@@ -557,28 +578,49 @@ class EnhancedDiscordService {
       const oneHour = item.periods['1h'] ? `${item.periods['1h'] > 0 ? '+' : ''}${item.periods['1h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const fourHour = item.periods['4h'] ? `${item.periods['4h'] > 0 ? '+' : ''}${item.periods['4h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       
-      positiveTable += ` ${rank} | ${symbolPadded} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
+      positiveTable += ` ${rank} | ${symbolPadded} |${priceChange} |${marketCap} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
     });
     
     positiveTable += '```\n';
     
     // 生成負異動表格
     let negativeTable = '```\n📊 持倉異動排行 負異動 TOP8 (各時間周期對比)\n\n';
-    negativeTable += '排名 | 幣種          | 價格異動  | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉\n';
-    negativeTable += '-----|-------------|----------|----------|----------|----------|----------\n';
+    negativeTable += '排名 | 幣種          | 價格異動 | 總市值($)   | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉\n';
+    negativeTable += '-----|-------------|----------|-------------|----------|----------|----------|----------\n';
     
     negativeChanges.forEach((item, index) => {
       const rank = String(index + 1).padStart(2);
       const symbolPadded = item.symbol.padEnd(12);
       
-      // 計算價格異動 (使用15分鐘週期作為參考)
+      // 從實時數據獲取價格異動和總市值
       let priceChange = '   0.00%';
-      if (priceData && priceData.current && priceData['15m']) {
-        const currentPrice = priceData.current.get(item.symbol);
-        const historicalPrice = priceData['15m'].get(item.symbol);
-        if (currentPrice && historicalPrice && historicalPrice.price > 0) {
-          const change = ((currentPrice.price - historicalPrice.price) / historicalPrice.price) * 100;
-          priceChange = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`.padStart(8);
+      let marketCap = '    0';
+      
+      // 使用真實的持倉數據計算價格異動
+      if (changes['15m'] && changes['15m'].positive) {
+        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
+        if (match && match.priceChange !== undefined) {
+          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
+        }
+      }
+      if (changes['15m'] && changes['15m'].negative) {
+        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
+        if (match && match.priceChange !== undefined) {
+          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
+        }
+      }
+      
+      // 獲取總市值（使用24h交易額作為指標）
+      if (changes['15m'] && changes['15m'].positive) {
+        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
+        if (match && match.marketCap) {
+          marketCap = this.formatNumber(match.marketCap).padStart(11);
+        }
+      }
+      if (changes['15m'] && changes['15m'].negative) {
+        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
+        if (match && match.marketCap) {
+          marketCap = this.formatNumber(match.marketCap).padStart(11);
         }
       }
       
@@ -588,7 +630,7 @@ class EnhancedDiscordService {
       const oneHour = item.periods['1h'] ? `${item.periods['1h'] > 0 ? '+' : ''}${item.periods['1h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const fourHour = item.periods['4h'] ? `${item.periods['4h'] > 0 ? '+' : ''}${item.periods['4h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       
-      negativeTable += ` ${rank} | ${symbolPadded} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
+      negativeTable += ` ${rank} | ${symbolPadded} |${priceChange} |${marketCap} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
     });
     
     negativeTable += '```';
