@@ -253,33 +253,7 @@ class EnhancedDiscordService {
   }
 
   createFundingRateAlertEmbed(data) {
-    // 如果傳入的是持倉異動數據，則顯示持倉異動表格
-    if (data.changes) {
-      return this.createCombinedPositionChangeEmbed(data.changes, data.priceData);
-    }
-    
     const { rankings } = data;
-    
-    // 模擬持倉異動數據格式，顯示負異動和正異動表格
-    let negativeTable = '```\n📊 持倉異動排行 負異動 TOP8 (各時間周期對比)\n\n';
-    negativeTable += '排名 | 幣種          | 價格異動  | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉\n';
-    negativeTable += '-----|-------------|----------|----------|----------|----------|----------\n';
-    
-    // 使用負費率數據模擬負異動
-    const negativeRates = rankings.negative.slice(0, 8);
-    negativeRates.forEach((item, index) => {
-      const rank = String(index + 1).padStart(2);
-      const symbolPadded = item.symbol.padEnd(12);
-      const priceChange = '   0.00%';
-      const fiveMinChange = '   0.00%';
-      const fifteenMin = `${(item.fundingRate * 100 * 10).toFixed(2)}%`.padStart(9); // 模擬負異動
-      const oneHour = `${(item.fundingRate * 100 * 15).toFixed(2)}%`.padStart(9);
-      const fourHour = `${(item.fundingRate * 100 * 20).toFixed(2)}%`.padStart(9);
-      
-      negativeTable += ` ${rank} | ${symbolPadded} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
-    });
-    
-    negativeTable += '```\n';
     
     // 北京時間格式化
     const beijingTime = new Date().toLocaleString('zh-CN', {
@@ -292,45 +266,56 @@ class EnhancedDiscordService {
       hour12: false
     });
     
-    let positiveTable = '```\n📊 持倉異動排行 正異動 TOP8 (各時間周期對比)\n\n';
-    positiveTable += '排名 | 幣種          | 價格異動  | 5分持倉  | 15分持倉 | 1h持倉   | 4h持倉\n';
-    positiveTable += '-----|-------------|----------|----------|----------|----------|----------\n';
+    // 生成資金費率表格
+    let negativeTable = '```\n📊 資金費率排行 負費率 TOP15\n\n';
+    negativeTable += '排名 | 幣種          | 資金費率   | 預估年化\n';
+    negativeTable += '-----|-------------|------------|----------\n';
     
-    // 使用正費率數據模擬正異動
-    const positiveRates = rankings.positive.slice(0, 8);
-    positiveRates.forEach((item, index) => {
+    rankings.negative.slice(0, 15).forEach((item, index) => {
       const rank = String(index + 1).padStart(2);
       const symbolPadded = item.symbol.padEnd(12);
-      const priceChange = '   0.00%';
-      const fiveMinChange = '   0.00%';
-      const fifteenMin = `+${(item.fundingRate * 100 * 10).toFixed(2)}%`.padStart(9); // 模擬正異動
-      const oneHour = `+${(item.fundingRate * 100 * 15).toFixed(2)}%`.padStart(9);
-      const fourHour = `+${(item.fundingRate * 100 * 20).toFixed(2)}%`.padStart(9);
+      const rate = `${(item.fundingRate * 100).toFixed(4)}%`.padStart(10);
+      const annualized = `${(item.fundingRate * 100 * 365 * 3).toFixed(2)}%`.padStart(9);
       
-      positiveTable += ` ${rank} | ${symbolPadded} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
+      negativeTable += ` ${rank} | ${symbolPadded} | ${rate} | ${annualized}\n`;
+    });
+    
+    negativeTable += '```\n';
+    
+    let positiveTable = '```\n📊 資金費率排行 正費率 TOP15\n\n';
+    positiveTable += '排名 | 幣種          | 資金費率   | 預估年化\n';
+    positiveTable += '-----|-------------|------------|----------\n';
+    
+    rankings.positive.slice(0, 15).forEach((item, index) => {
+      const rank = String(index + 1).padStart(2);
+      const symbolPadded = item.symbol.padEnd(12);
+      const rate = `+${(item.fundingRate * 100).toFixed(4)}%`.padStart(9);
+      const annualized = `+${(item.fundingRate * 100 * 365 * 3).toFixed(2)}%`.padStart(8);
+      
+      positiveTable += ` ${rank} | ${symbolPadded} | ${rate} | ${annualized}\n`;
     });
     
     positiveTable += '```';
 
     return {
-      title: '📊 持倉異動排行 (各時間周期對比)',
-      description: `持倉量變動統計 - ${beijingTime}`,
-      color: 0x9b59b6,
+      title: '📊 資金費率排行榜',
+      description: `當前資金費率統計 - ${beijingTime}`,
+      color: 0xf39c12,
       fields: [
         {
-          name: '📉 負異動 TOP8',
+          name: '📉 負費率 TOP15 (做多收費)',
           value: negativeTable,
           inline: false
         },
         {
-          name: '📈 正異動 TOP8',
+          name: '📈 正費率 TOP15 (做空收費)',
           value: positiveTable,
           inline: false
         }
       ],
       timestamp: new Date().toISOString(),
       footer: {
-        text: `交易所監控系統 - 持倉異動監控 [ ${beijingTime.split(' ')[1]} ]`,
+        text: `交易所監控系統 - 資金費率監控 [ ${beijingTime.split(' ')[1]} ]`,
         icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
       }
     };
