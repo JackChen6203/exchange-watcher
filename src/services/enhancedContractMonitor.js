@@ -15,6 +15,7 @@ class EnhancedContractMonitor {
     // 持倉量數據存儲 (支持多個時間週期)
     this.openInterests = {
       current: new Map(),   // 當前數據
+      '5m': new Map(),      // 5分鐘前
       '15m': new Map(),     // 15分鐘前
       '30m': new Map(),     // 30分鐘前
       '1h': new Map(),      // 1小時前  
@@ -25,6 +26,7 @@ class EnhancedContractMonitor {
     // 價格數據存儲 (支持多個時間週期)
     this.priceData = {
       current: new Map(),   // 當前價格數據
+      '5m': new Map(),      // 5分鐘前
       '15m': new Map(),     // 15分鐘前
       '30m': new Map(),     // 30分鐘前
       '1h': new Map(),      // 1小時前  
@@ -80,6 +82,7 @@ class EnhancedContractMonitor {
       this.startPeriodicReporting();
       this.startPriceMonitoring();
       this.startSwingStrategyMonitoring();
+      this.startPriceChangeReporting();
       
       this.logger.console('✅ 增強型監控系統初始化完成');
       
@@ -236,6 +239,15 @@ class EnhancedContractMonitor {
     this.logger.info('📈 啟動波段策略監控 (每15分鐘分析EMA信號)');
   }
 
+  startPriceChangeReporting() {
+    // 每5分鐘發送價格異動排行報告
+    this.priceChangeReportingInterval = setInterval(async () => {
+      await this.generateAndSendPriceChangeReport();
+    }, 5 * 60 * 1000); // 5分鐘
+    
+    this.logger.info('💰 啟動價格異動報告 (每5分鐘發送價格變動排行)');
+  }
+
   async updateContractData() {
     try {
       this.logger.debug('🔍 更新合約數據中...');
@@ -286,31 +298,57 @@ class EnhancedContractMonitor {
     const currentData = this.openInterests.current;
     const currentPriceData = this.priceData.current;
     
-    // 備份持倉量數據到不同時間週期
-    if (now % (15 * 60 * 1000) < 60000) { // 15分鐘標記
-      this.openInterests['15m'] = new Map(currentData);
-      this.priceData['15m'] = new Map(currentPriceData);
+    // 改用時間間隔方式備份，而不是取模運算
+    // 每次調用時移動歷史數據
+    
+    // 5分鐘備份 - 每次都更新，保持滾動窗口
+    if (currentData.size > 0) {
+      this.openInterests['5m'] = new Map(currentData);
+      this.priceData['5m'] = new Map(currentPriceData);
     }
     
-    if (now % (30 * 60 * 1000) < 60000) { // 30分鐘標記
-      this.openInterests['30m'] = new Map(currentData);
-      this.priceData['30m'] = new Map(currentPriceData);
+    // 15分鐘備份 - 根據時間戳決定
+    if (this.shouldBackupPeriod('15m', now)) {
+      this.openInterests['15m'] = new Map(this.openInterests['5m'] || currentData);
+      this.priceData['15m'] = new Map(this.priceData['5m'] || currentPriceData);
+      this.logger.debug('📦 備份15分鐘數據');
     }
     
-    if (now % (60 * 60 * 1000) < 60000) { // 1小時標記
-      this.openInterests['1h'] = new Map(currentData);
-      this.priceData['1h'] = new Map(currentPriceData);
+    // 1小時備份
+    if (this.shouldBackupPeriod('1h', now)) {
+      this.openInterests['1h'] = new Map(this.openInterests['15m'] || currentData);
+      this.priceData['1h'] = new Map(this.priceData['15m'] || currentPriceData);
+      this.logger.debug('📦 備份1小時數據');
     }
     
-    if (now % (4 * 60 * 60 * 1000) < 60000) { // 4小時標記
-      this.openInterests['4h'] = new Map(currentData);
-      this.priceData['4h'] = new Map(currentPriceData);
+    // 4小時備份
+    if (this.shouldBackupPeriod('4h', now)) {
+      this.openInterests['4h'] = new Map(this.openInterests['1h'] || currentData);
+      this.priceData['4h'] = new Map(this.priceData['1h'] || currentPriceData);
+      this.logger.debug('📦 備份4小時數據');
+    }
+  }
+  
+  shouldBackupPeriod(period, now) {
+    if (!this.lastBackupTime) {
+      this.lastBackupTime = {};
     }
     
-    if (now % (24 * 60 * 60 * 1000) < 60000) { // 24小時標記
-      this.openInterests['1d'] = new Map(currentData);
-      this.priceData['1d'] = new Map(currentPriceData);
+    const intervals = {
+      '5m': 5 * 60 * 1000,
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '4h': 4 * 60 * 60 * 1000
+    };
+    
+    const interval = intervals[period];
+    const lastBackup = this.lastBackupTime[period] || 0;
+    
+    if (now - lastBackup >= interval) {
+      this.lastBackupTime[period] = now;
+      return true;
     }
+    return false;
   }
 
   async generateAndSendReport() {
@@ -323,8 +361,8 @@ class EnhancedContractMonitor {
       // 生成資金費率排行 (包含持倉異動數據)
       const fundingRateRankings = this.calculateFundingRateWithPositionRankings();
       
-      // 發送Discord報告 - 將持倉異動整合到資金費率報告中
-      await this.discordService.sendFundingRateWithPositionReport(fundingRateRankings, positionChanges);
+      // 發送Discord報告 - 將持倉異動整合到資金費率報告中，包含價格數據
+      await this.discordService.sendFundingRateWithPositionReport(fundingRateRankings, positionChanges, this.priceData);
       
       this.logger.info('✅ 報告發送完成');
       
@@ -333,8 +371,25 @@ class EnhancedContractMonitor {
     }
   }
 
+  async generateAndSendPriceChangeReport() {
+    try {
+      this.logger.info('💰 生成價格異動排行報告...');
+      
+      // 生成價格變動排行
+      const priceChanges = this.calculatePriceChanges();
+      
+      // 發送價格異動報告到專用頻道
+      await this.discordService.sendPriceChangeReport(priceChanges);
+      
+      this.logger.info('✅ 價格異動報告發送完成');
+      
+    } catch (error) {
+      this.logger.error('❌ 生成價格異動報告失敗:', error);
+    }
+  }
+
   calculateOpenInterestChanges() {
-    const periods = ['15m', '1h', '4h', '1d'];
+    const periods = ['5m', '15m', '1h', '4h'];
     const results = {};
     
     periods.forEach(period => {
@@ -358,6 +413,59 @@ class EnhancedContractMonitor {
                 previousOpenInterest: historical.openInterestUsd,
                 change,
                 changePercent,
+                timestamp: Date.now()
+              });
+            }
+          }
+        });
+      }
+      
+      // 排序：正異動和負異動分別排序
+      const positiveChanges = changes
+        .filter(c => c.change > 0)
+        .sort((a, b) => b.changePercent - a.changePercent)
+        .slice(0, 15);
+        
+      const negativeChanges = changes
+        .filter(c => c.change < 0)
+        .sort((a, b) => a.changePercent - b.changePercent)
+        .slice(0, 15);
+      
+      results[period] = {
+        positive: positiveChanges,
+        negative: negativeChanges
+      };
+    });
+    
+    return results;
+  }
+
+  calculatePriceChanges() {
+    const periods = ['5m', '15m', '1h', '4h'];
+    const results = {};
+    
+    periods.forEach(period => {
+      const currentPrices = this.priceData.current;
+      const historicalPrices = this.priceData[period];
+      const changes = [];
+      
+      if (historicalPrices && historicalPrices.size > 0) {
+        currentPrices.forEach((current, symbol) => {
+          const historical = historicalPrices.get(symbol);
+          
+          if (historical && historical.price > 0) {
+            const change = current.price - historical.price;
+            const changePercent = (change / historical.price) * 100;
+            
+            // 只記錄有意義的價格變動 (大於0.5%或絕對值大於$0.001)
+            if (Math.abs(changePercent) > 0.5 || Math.abs(change) > 0.001) {
+              changes.push({
+                symbol,
+                currentPrice: current.price,
+                previousPrice: historical.price,
+                change,
+                changePercent,
+                volume24h: current.volume || 0,
                 timestamp: Date.now()
               });
             }
@@ -691,6 +799,11 @@ class EnhancedContractMonitor {
     if (this.swingStrategyMonitor) {
       clearInterval(this.swingStrategyMonitor);
       this.swingStrategyMonitor = null;
+    }
+    
+    if (this.priceChangeReportingInterval) {
+      clearInterval(this.priceChangeReportingInterval);
+      this.priceChangeReportingInterval = null;
     }
     
     this.logger.info('📴 增強型合約監控已停止');

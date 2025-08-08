@@ -409,21 +409,27 @@ class EnhancedDiscordService {
     return await this.sendAlert('funding_rate_alert', { rankings });
   }
 
-  async sendFundingRateWithPositionReport(fundingRateRankings, positionChanges) {
+  async sendFundingRateWithPositionReport(fundingRateRankings, positionChanges, priceData = null) {
     // 1. 發送資金費率報告到資金費率頻道
     await this.sendAlert('funding_rate_alert', { rankings: fundingRateRankings });
     
     // 避免頻率限制
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    // 2. 發送持倉異動報告到持倉頻道 (只發送一次綜合報告，避免重複)
-    await this.sendPositionChangeReport(positionChanges, 'position');
+    // 2. 發送持倉異動報告到持倉頻道 (包含價格數據)
+    await this.sendPositionChangeReport(positionChanges, 'position', priceData);
   }
 
-  async sendPositionChangeReport(changes, channel = 'position') {
+  async sendPositionChangeReport(changes, channel = 'position', priceData = null) {
     // 生成綜合多時間週期對比報告 (避免重複發送單個時間週期報告)
-    const combinedEmbed = this.createCombinedPositionChangeEmbed(changes);
+    const combinedEmbed = this.createCombinedPositionChangeEmbed(changes, priceData);
     await this.sendEmbed(combinedEmbed, channel);
+  }
+
+  async sendPriceChangeReport(priceChanges) {
+    // 發送價格異動排行報告到價格異動頻道
+    const embed = this.createPriceChangeRankingEmbed(priceChanges);
+    await this.sendEmbed(embed, 'price_alert');
   }
 
   createPositionChangeEmbed(data, period) {
@@ -473,10 +479,10 @@ class EnhancedDiscordService {
     };
   }
 
-  createCombinedPositionChangeEmbed(changes) {
+  createCombinedPositionChangeEmbed(changes, priceData = null) {
     // 創建綜合多時間週期對比表格
-    const periods = ['15m', '1h', '4h', '1d'];
-    const periodNames = { '15m': '15分持倉', '1h': '1h持倉', '4h': '4h持倉', '1d': '1d持倉' };
+    const periods = ['5m', '15m', '1h', '4h'];
+    const periodNames = { '5m': '5分持倉', '15m': '15分持倉', '1h': '1h持倉', '4h': '4h持倉' };
     
     // 收集所有有意義的變動數據
     const allSymbols = new Set();
@@ -525,14 +531,26 @@ class EnhancedDiscordService {
     
     positiveChanges.forEach((item, index) => {
       const rank = String(index + 1).padStart(2);
-      const symbol = item.symbol.padEnd(12);
-      const priceChange = '   0.00%'; // 價格變動暫時設為0
-      const fiveMinChange = '   0.00%'; // 5分變動暫時設為0
+      const symbolPadded = item.symbol.padEnd(12);
+      
+      // 計算價格異動 (使用15分鐘週期作為參考)
+      let priceChange = '   0.00%';
+      if (priceData && priceData.current && priceData['15m']) {
+        const currentPrice = priceData.current.get(item.symbol);
+        const historicalPrice = priceData['15m'].get(item.symbol);
+        if (currentPrice && historicalPrice && historicalPrice.price > 0) {
+          const change = ((currentPrice.price - historicalPrice.price) / historicalPrice.price) * 100;
+          priceChange = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`.padStart(8);
+        }
+      }
+      
+      // 格式化各時間週期持倉變動
+      const fiveMinChange = item.periods['5m'] ? `${item.periods['5m'] > 0 ? '+' : ''}${item.periods['5m'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const fifteenMin = item.periods['15m'] ? `${item.periods['15m'] > 0 ? '+' : ''}${item.periods['15m'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const oneHour = item.periods['1h'] ? `${item.periods['1h'] > 0 ? '+' : ''}${item.periods['1h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const fourHour = item.periods['4h'] ? `${item.periods['4h'] > 0 ? '+' : ''}${item.periods['4h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       
-      positiveTable += ` ${rank} | ${symbol} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
+      positiveTable += ` ${rank} | ${symbolPadded} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
     });
     
     positiveTable += '```\n';
@@ -544,14 +562,26 @@ class EnhancedDiscordService {
     
     negativeChanges.forEach((item, index) => {
       const rank = String(index + 1).padStart(2);
-      const symbol = item.symbol.padEnd(12);
-      const priceChange = '   0.00%'; // 價格變動暫時設為0
-      const fiveMinChange = '   0.00%'; // 5分變動暫時設為0
+      const symbolPadded = item.symbol.padEnd(12);
+      
+      // 計算價格異動 (使用15分鐘週期作為參考)
+      let priceChange = '   0.00%';
+      if (priceData && priceData.current && priceData['15m']) {
+        const currentPrice = priceData.current.get(item.symbol);
+        const historicalPrice = priceData['15m'].get(item.symbol);
+        if (currentPrice && historicalPrice && historicalPrice.price > 0) {
+          const change = ((currentPrice.price - historicalPrice.price) / historicalPrice.price) * 100;
+          priceChange = `${change > 0 ? '+' : ''}${change.toFixed(2)}%`.padStart(8);
+        }
+      }
+      
+      // 格式化各時間週期持倉變動
+      const fiveMinChange = item.periods['5m'] ? `${item.periods['5m'] > 0 ? '+' : ''}${item.periods['5m'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const fifteenMin = item.periods['15m'] ? `${item.periods['15m'] > 0 ? '+' : ''}${item.periods['15m'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const oneHour = item.periods['1h'] ? `${item.periods['1h'] > 0 ? '+' : ''}${item.periods['1h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       const fourHour = item.periods['4h'] ? `${item.periods['4h'] > 0 ? '+' : ''}${item.periods['4h'].toFixed(2)}%`.padStart(9) : '    0.00%';
       
-      negativeTable += ` ${rank} | ${symbol} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
+      negativeTable += ` ${rank} | ${symbolPadded} |${priceChange} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
     });
     
     negativeTable += '```';
@@ -619,6 +649,118 @@ class EnhancedDiscordService {
       timestamp: new Date().toISOString(),
       footer: {
         text: '交易所監控系統 - 持倉異動監控 (整合至資金費率頻道)',
+        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
+      }
+    };
+  }
+
+  createPriceChangeRankingEmbed(priceChanges) {
+    // 創建多時間週期價格異動排行表格
+    const periods = ['5m', '15m', '1h', '4h'];
+    const periodNames = { '5m': '5分異動', '15m': '15分異動', '1h': '1h異動', '4h': '4h異動' };
+    
+    // 收集所有有意義的價格變動數據
+    const allSymbols = new Set();
+    const symbolData = new Map();
+    
+    periods.forEach(period => {
+      const periodData = priceChanges[period];
+      if (periodData) {
+        [...periodData.positive, ...periodData.negative].forEach(item => {
+          allSymbols.add(item.symbol);
+          if (!symbolData.has(item.symbol)) {
+            symbolData.set(item.symbol, {
+              symbol: item.symbol,
+              periods: {},
+              maxAbsChange: 0,
+              currentPrice: item.currentPrice
+            });
+          }
+          symbolData.get(item.symbol).periods[period] = item.changePercent;
+          symbolData.get(item.symbol).maxAbsChange = Math.max(
+            symbolData.get(item.symbol).maxAbsChange,
+            Math.abs(item.changePercent)
+          );
+        });
+      }
+    });
+    
+    // 按最大變動幅度排序，分為正異動和負異動
+    const sortedData = Array.from(symbolData.values())
+      .filter(item => item.maxAbsChange > 0.5) // 只顯示超過0.5%變動的
+      .sort((a, b) => b.maxAbsChange - a.maxAbsChange);
+    
+    const positiveChanges = sortedData.filter(item => {
+      const latest15m = item.periods['15m'] || item.periods['5m'] || 0;
+      return latest15m > 0;
+    }).slice(0, 8);
+    
+    const negativeChanges = sortedData.filter(item => {
+      const latest15m = item.periods['15m'] || item.periods['5m'] || 0;
+      return latest15m < 0;
+    }).slice(0, 8);
+    
+    // 生成正異動表格
+    let positiveTable = '```\n💹 價格異動排行 正異動 TOP8 (各時間周期對比)\n\n';
+    positiveTable += '排名 | 幣種          | 當前價格      | 5分異動  | 15分異動 | 1h異動   | 4h異動\n';
+    positiveTable += '-----|-------------|-------------|----------|----------|----------|----------\n';
+    
+    positiveChanges.forEach((item, index) => {
+      const rank = String(index + 1).padStart(2);
+      const symbolPadded = item.symbol.padEnd(12);
+      const currentPrice = `$${item.currentPrice.toFixed(6)}`.padEnd(12);
+      
+      // 格式化各時間週期價格變動
+      const fiveMinChange = item.periods['5m'] ? `${item.periods['5m'] > 0 ? '+' : ''}${item.periods['5m'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      const fifteenMin = item.periods['15m'] ? `${item.periods['15m'] > 0 ? '+' : ''}${item.periods['15m'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      const oneHour = item.periods['1h'] ? `${item.periods['1h'] > 0 ? '+' : ''}${item.periods['1h'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      const fourHour = item.periods['4h'] ? `${item.periods['4h'] > 0 ? '+' : ''}${item.periods['4h'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      
+      positiveTable += ` ${rank} | ${symbolPadded} | ${currentPrice} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
+    });
+    
+    positiveTable += '```\n';
+    
+    // 生成負異動表格
+    let negativeTable = '```\n📉 價格異動排行 負異動 TOP8 (各時間周期對比)\n\n';
+    negativeTable += '排名 | 幣種          | 當前價格      | 5分異動  | 15分異動 | 1h異動   | 4h異動\n';
+    negativeTable += '-----|-------------|-------------|----------|----------|----------|----------\n';
+    
+    negativeChanges.forEach((item, index) => {
+      const rank = String(index + 1).padStart(2);
+      const symbolPadded = item.symbol.padEnd(12);
+      const currentPrice = `$${item.currentPrice.toFixed(6)}`.padEnd(12);
+      
+      // 格式化各時間週期價格變動
+      const fiveMinChange = item.periods['5m'] ? `${item.periods['5m'] > 0 ? '+' : ''}${item.periods['5m'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      const fifteenMin = item.periods['15m'] ? `${item.periods['15m'] > 0 ? '+' : ''}${item.periods['15m'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      const oneHour = item.periods['1h'] ? `${item.periods['1h'] > 0 ? '+' : ''}${item.periods['1h'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      const fourHour = item.periods['4h'] ? `${item.periods['4h'] > 0 ? '+' : ''}${item.periods['4h'].toFixed(2)}%`.padStart(9) : '    0.00%';
+      
+      negativeTable += ` ${rank} | ${symbolPadded} | ${currentPrice} |${fiveMinChange} |${fifteenMin} |${oneHour} |${fourHour}\n`;
+    });
+    
+    negativeTable += '```';
+    
+    return {
+      title: '💰 價格異動排行 (各時間周期對比)',
+      description: `價格變動統計 - ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`,
+      color: 0xf39c12, // 橙色以區別其他報告
+      fields: [
+        {
+          name: '📈 正異動 TOP8',
+          value: positiveTable,
+          inline: false
+        },
+        {
+          name: '📉 負異動 TOP8', 
+          value: negativeTable,
+          inline: false
+        }
+      ],
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: '交易所監控系統 - 價格異動監控',
         icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
       }
     };
