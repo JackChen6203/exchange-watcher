@@ -317,15 +317,14 @@ class EnhancedContractMonitor {
     try {
       this.logger.info('📊 生成持倉異動和資金費率排行報告...');
       
-      // 生成持倉異動排行 (包含價格變動)
-      const positionChanges = this.calculatePositionChangesWithPriceData();
+      // 生成持倉異動排行 (正確使用Open Interest數據)
+      const positionChanges = this.calculateOpenInterestChanges();
       
-      // 生成資金費率排行
-      const fundingRateRankings = this.calculateFundingRateRankings();
+      // 生成資金費率排行 (包含持倉異動數據)
+      const fundingRateRankings = this.calculateFundingRateWithPositionRankings();
       
-      // 發送Discord報告到不同頻道
-      await this.discordService.sendPositionChangeReport(positionChanges);
-      await this.discordService.sendFundingRateReport(fundingRateRankings);
+      // 發送Discord報告 - 將持倉異動整合到資金費率報告中
+      await this.discordService.sendFundingRateWithPositionReport(fundingRateRankings, positionChanges);
       
       this.logger.info('✅ 報告發送完成');
       
@@ -334,41 +333,34 @@ class EnhancedContractMonitor {
     }
   }
 
-  calculatePositionChangesWithPriceData() {
-    const periods = ['15m', '30m', '1h', '4h', '1d'];
+  calculateOpenInterestChanges() {
+    const periods = ['15m', '1h', '4h', '1d'];
     const results = {};
     
     periods.forEach(period => {
       const currentData = this.openInterests.current;
       const historicalData = this.openInterests[period];
-      const currentPriceData = this.priceData.current;
-      const historicalPriceData = this.priceData[period];
       const changes = [];
       
       if (historicalData && historicalData.size > 0) {
         currentData.forEach((current, symbol) => {
           const historical = historicalData.get(symbol);
-          const currentPrice = currentPriceData.get(symbol);
-          const historicalPrice = historicalPriceData?.get(symbol);
           
-          if (historical) {
+          if (historical && historical.openInterestUsd > 0) {
             const change = current.openInterestUsd - historical.openInterestUsd;
             const changePercent = (change / historical.openInterestUsd) * 100;
             
-            // 計算價格變動
-            let priceChange = null;
-            if (currentPrice && historicalPrice) {
-              priceChange = ((currentPrice.price - historicalPrice.price) / historicalPrice.price) * 100;
+            // 只記錄有意義的持倉量變動 (大於1%或金額超過$10,000)
+            if (Math.abs(changePercent) > 1 || Math.abs(change) > 10000) {
+              changes.push({
+                symbol,
+                currentOpenInterest: current.openInterestUsd,
+                previousOpenInterest: historical.openInterestUsd,
+                change,
+                changePercent,
+                timestamp: Date.now()
+              });
             }
-            
-            changes.push({
-              symbol,
-              current: current.openInterestUsd,
-              previous: historical.openInterestUsd,
-              change,
-              changePercent,
-              priceChange
-            });
           }
         });
       }
@@ -393,14 +385,20 @@ class EnhancedContractMonitor {
     return results;
   }
 
-  calculateFundingRateRankings() {
+  calculateFundingRateWithPositionRankings() {
     const fundingRates = Array.from(this.fundingRates.values())
       .filter(rate => rate.fundingRate != null)
-      .map(rate => ({
-        symbol: rate.symbol,
-        fundingRate: rate.fundingRate,
-        fundingRatePercent: rate.fundingRate * 100
-      }));
+      .map(rate => {
+        // 添加持倉量信息到資金費率數據中
+        const openInterest = this.openInterests.current.get(rate.symbol);
+        return {
+          symbol: rate.symbol,
+          fundingRate: rate.fundingRate,
+          fundingRatePercent: rate.fundingRate * 100,
+          openInterestUsd: openInterest ? openInterest.openInterestUsd : 0,
+          nextFundingTime: rate.nextFundingTime
+        };
+      });
     
     // 正資金費率排行（最高15個）
     const positiveFunding = fundingRates

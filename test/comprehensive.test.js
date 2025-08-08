@@ -219,7 +219,7 @@ class ComprehensiveTestSuite {
         timestamp: Date.now() - 15 * 60 * 1000
       });
       
-      const changes = monitor.calculatePositionChangesWithPriceData();
+      const changes = monitor.calculateOpenInterestChanges();
       if (!changes['15m'] || !changes['15m'].positive || !changes['15m'].negative) {
         throw new Error('持倉量變化計算錯誤');
       }
@@ -238,7 +238,7 @@ class ComprehensiveTestSuite {
         timestamp: Date.now()
       });
       
-      const rankings = monitor.calculateFundingRateRankings();
+      const rankings = monitor.calculateFundingRateWithPositionRankings();
       if (!rankings.positive || !rankings.negative) {
         throw new Error('資金費率排行計算錯誤');
       }

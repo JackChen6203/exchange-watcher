@@ -188,7 +188,7 @@ class EnhancedTestSuite {
         price: 44000 
       });
       
-      const changes = monitor.calculatePositionChangesWithPriceData();
+      const changes = monitor.calculateOpenInterestChanges();
       
       assert(changes['15m'], '應該包含 15m 數據');
       assert(changes['15m'].positive.length > 0, '應該檢測到正變化');
@@ -196,7 +196,7 @@ class EnhancedTestSuite {
       const btcChange = changes['15m'].positive.find(c => c.symbol === 'BTCUSDT');
       assert(btcChange, '應該包含 BTCUSDT 變化');
       assert.strictEqual(btcChange.changePercent, (100000/900000) * 100, '變化百分比計算正確');
-      assert(btcChange.priceChange !== null, '應該包含價格變化');
+      assert(typeof btcChange.currentOpenInterest === 'number', '應該包含當前持倉量');
     });
 
     console.log('✅ 合約監控測試完成\n');

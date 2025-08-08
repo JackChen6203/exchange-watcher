@@ -1,0 +1,3 @@
+ 1.目前持倉異動,價格異動顯示的資料都是錯誤的,應該將持倉異動部分移動到                    │
+│   資金費率,持倉異動功能重寫                                                               │
+│   文件請參考 https://www.bitget.com/api-doc/contract/market/Get-Open-Interest  

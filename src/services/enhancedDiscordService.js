@@ -262,9 +262,10 @@ class EnhancedDiscordService {
     if (positiveRates.length > 0) {
       fields.push({
         name: '🔥 資金費率排行榜 - 高費率 (前15名)',
-        value: positiveRates.map((item, index) => 
-          `${index + 1}. **${item.symbol}** ${(item.fundingRate * 100).toFixed(4)}%`
-        ).join('\n'),
+        value: positiveRates.map((item, index) => {
+          const openInterestInfo = item.openInterestUsd > 0 ? ` (OI: $${this.formatNumber(item.openInterestUsd)})` : '';
+          return `${index + 1}. **${item.symbol}** ${(item.fundingRate * 100).toFixed(4)}%${openInterestInfo}`;
+        }).join('\n'),
         inline: false
       });
     }
@@ -272,21 +273,22 @@ class EnhancedDiscordService {
     if (negativeRates.length > 0) {
       fields.push({
         name: '❄️ 資金費率排行榜 - 負費率 (前15名)',
-        value: negativeRates.map((item, index) => 
-          `${index + 1}. **${item.symbol}** ${(item.fundingRate * 100).toFixed(4)}%`
-        ).join('\n'),
+        value: negativeRates.map((item, index) => {
+          const openInterestInfo = item.openInterestUsd > 0 ? ` (OI: $${this.formatNumber(item.openInterestUsd)})` : '';
+          return `${index + 1}. **${item.symbol}** ${(item.fundingRate * 100).toFixed(4)}%${openInterestInfo}`;
+        }).join('\n'),
         inline: false
       });
     }
 
     return {
       title: '💰 資金費率監控報告',
-      description: `資金費率異動統計 - ${new Date().toLocaleString('zh-TW')}`,
+      description: `資金費率異動統計 (含持倉量信息) - ${new Date().toLocaleString('zh-TW')}`,
       color: 0x3498db,
       fields,
       timestamp: new Date().toISOString(),
       footer: {
-        text: '交易所監控系統 - 資金費率專用頻道',
+        text: '交易所監控系統 - 資金費率 & 持倉異動整合頻道',
         icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
       }
     };
@@ -387,6 +389,27 @@ class EnhancedDiscordService {
     return await this.sendAlert('funding_rate_alert', { rankings });
   }
 
+  async sendFundingRateWithPositionReport(fundingRateRankings, positionChanges) {
+    // 發送資金費率報告到資金費率頻道
+    await this.sendAlert('funding_rate_alert', { rankings: fundingRateRankings });
+    
+    // 在資金費率頻道中也發送持倉異動報告
+    const periods = Object.keys(positionChanges);
+    
+    for (const period of periods) {
+      const periodData = positionChanges[period];
+      if (!periodData || (periodData.positive.length === 0 && periodData.negative.length === 0)) {
+        continue;
+      }
+
+      const embed = this.createOpenInterestChangeEmbed(periodData, period);
+      await this.sendEmbed(embed, 'funding_rate'); // 發送到資金費率頻道
+      
+      // 避免頻率限制
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
   async sendPositionChangeReport(changes, channel = 'position') {
     const periods = Object.keys(changes);
     
@@ -446,6 +469,50 @@ class EnhancedDiscordService {
       timestamp: new Date().toISOString(),
       footer: {
         text: '交易所監控系統 - 持倉量監控',
+        icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
+      }
+    };
+  }
+
+  createOpenInterestChangeEmbed(data, period) {
+    const { positive, negative } = data;
+    const fields = [];
+    
+    const periodNames = {
+      '15m': '15分鐘',
+      '1h': '1小時',
+      '4h': '4小時',
+      '1d': '1天'
+    };
+    
+    if (positive.length > 0) {
+      fields.push({
+        name: `📈 持倉量增加排行榜 - ${periodNames[period]} (前15名)`,
+        value: positive.slice(0, 15).map((item, index) => {
+          return `${index + 1}. **${item.symbol}** +${item.changePercent.toFixed(2)}% ($${this.formatNumber(item.change)})`;
+        }).join('\n'),
+        inline: false
+      });
+    }
+    
+    if (negative.length > 0) {
+      fields.push({
+        name: `📉 持倉量減少排行榜 - ${periodNames[period]} (前15名)`,
+        value: negative.slice(0, 15).map((item, index) => {
+          return `${index + 1}. **${item.symbol}** ${item.changePercent.toFixed(2)}% ($${this.formatNumber(Math.abs(item.change))})`;
+        }).join('\n'),
+        inline: false
+      });
+    }
+
+    return {
+      title: `📊 持倉異動報告 - ${periodNames[period]}`,
+      description: `持倉量變動統計 (Open Interest) - ${new Date().toLocaleString('zh-TW')}`,
+      color: 0x9b59b6, // 紫色以區別資金費率
+      fields,
+      timestamp: new Date().toISOString(),
+      footer: {
+        text: '交易所監控系統 - 持倉異動監控 (整合至資金費率頻道)',
         icon_url: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
       }
     };

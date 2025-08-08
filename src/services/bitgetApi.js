@@ -269,10 +269,10 @@ class BitgetApi {
     }
   }
 
-  // 獲取合約開倉量(Open Interest) - 使用V2 API (修復版)
+  // 獲取合約開倉量(Open Interest) - 使用正確的V2 API
   async getOpenInterest(symbol, productType = 'umcbl') {
     try {
-      // 產品類型映射 - 根據官方文檔修正
+      // 產品類型映射 - 根據Bitget官方文檔
       const productTypeMap = {
         'umcbl': 'usdt-futures',
         'dmcbl': 'coin-futures',
@@ -281,7 +281,7 @@ class BitgetApi {
       
       const mappedProductType = productTypeMap[productType] || 'usdt-futures';
       
-      // 根據官方文檔修正API路徑格式
+      // 根據Bitget官方文檔的正確API路徑
       const requestPath = `/api/v2/mix/market/open-interest`;
       const params = new URLSearchParams({
         symbol: symbol,
@@ -295,15 +295,24 @@ class BitgetApi {
       if (response.data.code === '00000' && response.data.data) {
         const data = response.data.data;
         
-        // 根據官方API文檔，直接處理返回的數據結構
+        // 處理返回的數據結構 - 根據Bitget API文檔
+        // data可能是數組或對象格式
+        let openInterestData;
+        if (Array.isArray(data) && data.length > 0) {
+          openInterestData = data[0];
+        } else if (data && typeof data === 'object') {
+          openInterestData = data;
+        } else {
+          throw new Error('無效的數據格式');
+        }
+        
         return {
           symbol: symbol,
-          openInterest: parseFloat(data.size) || 0,
-          openInterestUsd: parseFloat(data.amount) || 0, // amount字段為美元價值
-          timestamp: parseInt(data.ts) || Date.now()
+          openInterest: parseFloat(openInterestData.size) || parseFloat(openInterestData.openInterest) || 0,
+          openInterestUsd: parseFloat(openInterestData.amount) || parseFloat(openInterestData.openInterestUsd) || 0,
+          timestamp: parseInt(openInterestData.ts) || parseInt(openInterestData.timestamp) || Date.now()
         };
       } else {
-        // 如果API返回錯誤，記錄詳細信息
         console.warn(`⚠️ ${symbol} 開倉量API返回: ${response.data.msg || 'No data'}`);
         return {
           symbol: symbol,
@@ -315,7 +324,6 @@ class BitgetApi {
     } catch (error) {
       if (error.response) {
         console.warn(`⚠️ 獲取${symbol}開倉量失敗: ${error.response.status} - ${error.response.data?.msg || error.message}`);
-        // 不再拋出錯誤，而是返回默認值以保持程序運行
         return {
           symbol: symbol,
           openInterest: 0,
@@ -404,26 +412,60 @@ class BitgetApi {
     }
   }
 
-  // 批量獲取所有合約的開倉量 - 通過逐個獲取實現
+  // 批量獲取所有合約的開倉量 - 改進版本
   async getAllOpenInterest(productType = 'umcbl') {
     try {
-      // 先獲取所有合約
+      // 產品類型映射
+      const productTypeMap = {
+        'umcbl': 'usdt-futures',
+        'dmcbl': 'coin-futures',
+        'cmcbl': 'usdc-futures'
+      };
+      
+      const mappedProductType = productTypeMap[productType] || 'usdt-futures';
+      
+      try {
+        // 嘗試使用批量API獲取所有開倉量數據
+        const requestPath = `/api/v2/mix/market/open-interest`;
+        const params = new URLSearchParams({
+          productType: mappedProductType
+        });
+        
+        const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
+          timeout: 15000
+        });
+
+        if (response.data.code === '00000' && response.data.data) {
+          const data = response.data.data;
+          
+          // 處理批量數據
+          if (Array.isArray(data)) {
+            return data.map(item => ({
+              symbol: item.symbol,
+              openInterest: parseFloat(item.size) || parseFloat(item.openInterest) || 0,
+              openInterestUsd: parseFloat(item.amount) || parseFloat(item.openInterestUsd) || 0,
+              timestamp: parseInt(item.ts) || parseInt(item.timestamp) || Date.now()
+            })).filter(item => item.openInterestUsd > 0);
+          }
+        }
+      } catch (batchError) {
+        console.warn('⚠️ 批量API失敗，回退到逐個獲取:', batchError.message);
+      }
+      
+      // 回退到逐個獲取
       const contracts = await this.getSymbolsByProductType(productType);
       const openInterestData = [];
       
-      // 使用logger記錄，console在logger中處理
-      
-      // 分批處理，每批10個合約
-      const batchSize = 10;
+      // 分批處理，每批5個合約以避免頻率限制
+      const batchSize = 5;
       for (let i = 0; i < contracts.length; i += batchSize) {
         const batch = contracts.slice(i, i + batchSize);
         
         const batchPromises = batch.map(async (contract) => {
           try {
             const data = await this.getOpenInterest(contract.symbol, productType);
-            return data;
+            return data && data.openInterestUsd > 0 ? data : null;
           } catch (error) {
-            // 使用logger記錄，console在logger中處理
             return null;
           }
         });
@@ -433,13 +475,12 @@ class BitgetApi {
         
         // 批次間延遲，避免API限制
         if (i + batchSize < contracts.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
         
-        // 使用logger記錄，console在logger中處理
+        console.log(`📊 已獲取 ${openInterestData.length} 個開倉量數據...`);
       }
       
-      // 使用logger記錄，console在logger中處理
       return openInterestData;
       
     } catch (error) {
