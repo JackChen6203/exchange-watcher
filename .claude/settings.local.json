@@ -14,7 +14,10 @@
       "WebFetch(domain:www.bitget.com)",
       "Bash(npm run test:*)",
       "Bash(npm run lint)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(node:*)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

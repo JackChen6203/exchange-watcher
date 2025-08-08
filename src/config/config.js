@@ -3,9 +3,9 @@ require('dotenv').config();
 const config = {
   // Bitget API 配置 - 使用合約API
   api: {
-    key: process.env.API_KEY,
-    secret: process.env.API_SECRET,
-    passphrase: process.env.API_PASSPHRASE,
+    key: process.env.BITGET_API_KEY || process.env.API_KEY,
+    secret: process.env.BITGET_SECRET_KEY || process.env.API_SECRET,
+    passphrase: process.env.BITGET_PASSPHRASE || process.env.API_PASSPHRASE,
     baseUrl: process.env.BITGET_BASE_URL || 'https://api.bitget.com',
     // 現貨WebSocket（用於價格監控）
     wsUrl: process.env.BITGET_WS_URL || 'wss://ws.bitget.com/spot/v1/stream',

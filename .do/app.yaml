@@ -6,7 +6,7 @@ services:
     repo: Davis1233798/exchange_monitor
     branch: main
     deploy_on_push: true
-  run_command: npm start
+  run_command: npm run start:enhanced
   environment_slug: node-js
   instance_count: 1
   instance_size_slug: basic-xxs
@@ -41,3 +41,5 @@ services:
     value: Asia/Taipei
   - key: SKIP_DEPLOY_TEST
     value: "false"
+  - key: RUN_REAL_DATA_TEST
+    value: "true"

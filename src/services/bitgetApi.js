@@ -295,23 +295,42 @@ class BitgetApi {
       if (response.data.code === '00000' && response.data.data) {
         const data = response.data.data;
         
-        // 處理返回的數據結構 - 根據Bitget API文檔
-        // data可能是數組或對象格式
-        let openInterestData;
-        if (Array.isArray(data) && data.length > 0) {
-          openInterestData = data[0];
-        } else if (data && typeof data === 'object') {
-          openInterestData = data;
-        } else {
-          throw new Error('無效的數據格式');
+        // 處理V2 API的新數據格式 - openInterestList數組
+        if (data.openInterestList && Array.isArray(data.openInterestList) && data.openInterestList.length > 0) {
+          const openInterestItem = data.openInterestList[0];
+          
+          // 獲取當前價格以計算USD價值
+          let openInterestUsd = 0;
+          try {
+            const ticker = await this.getTicker(symbol, 'umcbl');
+            if (ticker && ticker.lastPr) {
+              openInterestUsd = parseFloat(openInterestItem.size) * parseFloat(ticker.lastPr);
+            }
+          } catch (priceError) {
+            console.warn(`⚠️ 無法獲取${symbol}價格，使用預設USD值`);
+          }
+          
+          return {
+            symbol: symbol,
+            openInterest: parseFloat(openInterestItem.size) || 0,
+            openInterestUsd: openInterestUsd,
+            timestamp: parseInt(data.ts) || Date.now()
+          };
         }
         
-        return {
-          symbol: symbol,
-          openInterest: parseFloat(openInterestData.size) || parseFloat(openInterestData.openInterest) || 0,
-          openInterestUsd: parseFloat(openInterestData.amount) || parseFloat(openInterestData.openInterestUsd) || 0,
-          timestamp: parseInt(openInterestData.ts) || parseInt(openInterestData.timestamp) || Date.now()
-        };
+        // 兼容舊格式
+        else if (data && typeof data === 'object') {
+          return {
+            symbol: symbol,
+            openInterest: parseFloat(data.size) || parseFloat(data.openInterest) || 0,
+            openInterestUsd: parseFloat(data.amount) || parseFloat(data.openInterestUsd) || 0,
+            timestamp: parseInt(data.ts) || parseInt(data.timestamp) || Date.now()
+          };
+        }
+        
+        else {
+          throw new Error('無效的數據格式');
+        }
       } else {
         console.warn(`⚠️ ${symbol} 開倉量API返回: ${response.data.msg || 'No data'}`);
         return {
@@ -424,33 +443,8 @@ class BitgetApi {
       
       const mappedProductType = productTypeMap[productType] || 'usdt-futures';
       
-      try {
-        // 嘗試使用批量API獲取所有開倉量數據
-        const requestPath = `/api/v2/mix/market/open-interest`;
-        const params = new URLSearchParams({
-          productType: mappedProductType
-        });
-        
-        const response = await axios.get(`${this.baseUrl}${requestPath}?${params}`, {
-          timeout: 15000
-        });
-
-        if (response.data.code === '00000' && response.data.data) {
-          const data = response.data.data;
-          
-          // 處理批量數據
-          if (Array.isArray(data)) {
-            return data.map(item => ({
-              symbol: item.symbol,
-              openInterest: parseFloat(item.size) || parseFloat(item.openInterest) || 0,
-              openInterestUsd: parseFloat(item.amount) || parseFloat(item.openInterestUsd) || 0,
-              timestamp: parseInt(item.ts) || parseInt(item.timestamp) || Date.now()
-            })).filter(item => item.openInterestUsd > 0);
-          }
-        }
-      } catch (batchError) {
-        console.warn('⚠️ 批量API失敗，回退到逐個獲取:', batchError.message);
-      }
+      // 注意：批量API不支持獲取所有合約的Open Interest，直接跳到逐個獲取
+      console.log('📊 使用逐個獲取方式來獲取Open Interest數據...');
       
       // 回退到逐個獲取
       const contracts = await this.getSymbolsByProductType(productType);

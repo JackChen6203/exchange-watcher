@@ -30,6 +30,12 @@ class EnhancedCryptoExchangeMonitor {
       this.isRunning = true;
       this.logger.console('✅ 增強型監控系統啟動成功');
       
+      // 如果是部署環境且設置了實際數據測試，執行測試
+      if (process.env.NODE_ENV === 'production' && process.env.RUN_REAL_DATA_TEST === 'true') {
+        this.logger.console('🚀 部署後自動執行實際數據測試...');
+        setTimeout(() => this.runRealDataTest(), 30000); // 30秒後執行測試
+      }
+      
       // 設置優雅關閉
       this.setupGracefulShutdown();
       
@@ -192,6 +198,53 @@ class EnhancedCryptoExchangeMonitor {
       
     } catch (error) {
       console.error('❌ 測試消息發送失敗:', error);
+    }
+  }
+
+  async runRealDataTest() {
+    try {
+      this.logger.console('🔍 執行實際數據測試...');
+      
+      // 測試數據收集
+      if (this.contractMonitor) {
+        this.logger.console('📊 測試合約數據收集...');
+        await this.contractMonitor.updateContractData();
+        
+        // 檢查數據收集狀態
+        const status = this.contractMonitor.getStatus();
+        this.logger.console('✅ 數據收集狀態:', {
+          合約數量: status.contractSymbols,
+          持倉數據: status.openInterestData,
+          資金費率數據: status.fundingRateData,
+          價格數據: status.priceData
+        });
+        
+        // 如果有數據，生成測試報告
+        if (status.openInterestData > 0 || status.fundingRateData > 0) {
+          this.logger.console('📈 生成實際數據報告...');
+          await this.contractMonitor.generateAndSendReport();
+          this.logger.console('✅ 實際數據報告已發送到Discord');
+        } else {
+          this.logger.warn('⚠️ 未收集到實際數據，可能是API配置問題');
+        }
+      }
+      
+      // 發送部署成功通知
+      await this.discordService.sendAlert('system_alert', {
+        message: '🎉 Digital Ocean 部署成功並完成實際數據測試',
+        level: 'info',
+        details: `部署時間: ${new Date().toLocaleString('zh-TW')}\n監控功能已啟動，正在收集實際交易數據`
+      });
+      
+    } catch (error) {
+      this.logger.error('❌ 實際數據測試失敗:', error);
+      
+      // 發送錯誤通知
+      await this.discordService.sendAlert('system_alert', {
+        message: '⚠️ Digital Ocean 部署後數據測試失敗',
+        level: 'warning', 
+        details: `錯誤: ${error.message}\n時間: ${new Date().toLocaleString('zh-TW')}`
+      });
     }
   }
 }
