@@ -79,8 +79,7 @@ class CryptoExchangeMonitor {
     const required = [
       'api.key',
       'api.secret', 
-      'api.passphrase',
-      'discord.webhookUrl'
+      'api.passphrase'
     ];
 
     for (const path of required) {
@@ -89,6 +88,14 @@ class CryptoExchangeMonitor {
         console.error(`❌ 缺少必要配置: ${path}`);
         return false;
       }
+    }
+
+    // 檢查Discord配置（現在是可選的）
+    const discordUrl = this.getNestedValue(this.config, 'discord.webhookUrl');
+    if (!discordUrl) {
+      console.log('⚠️ 未配置Discord Webhook，將禁用Discord通知功能');
+    } else {
+      console.log('✅ Discord配置已啟用');
     }
 
     console.log('✅ 配置驗證通過');

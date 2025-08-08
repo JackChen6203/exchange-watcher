@@ -52,6 +52,13 @@ class EnhancedDiscordService {
   async sendMessage(content, channel = 'default') {
     try {
       const webhookUrl = this.getWebhookUrl(channel);
+      
+      // 如果沒有配置webhook URL，直接返回
+      if (!webhookUrl) {
+        console.log(`⚠️ Discord webhook未配置 (${channel})，跳過消息發送`);
+        return;
+      }
+
       await this.checkRateLimit(webhookUrl);
 
       const payload = {
@@ -77,6 +84,14 @@ class EnhancedDiscordService {
 
   async sendEmbed(embed, channel = 'default') {
     try {
+      const webhookUrl = this.getWebhookUrl(channel);
+      
+      // 如果沒有配置webhook URL，直接返回
+      if (!webhookUrl) {
+        console.log(`⚠️ Discord webhook未配置 (${channel})，跳過消息發送`);
+        return;
+      }
+
       // 檢查重複發送
       const messageHash = this.generateMessageHash(embed, channel);
       if (this.messageCache.has(messageHash)) {
@@ -84,7 +99,6 @@ class EnhancedDiscordService {
         return;
       }
 
-      const webhookUrl = this.getWebhookUrl(channel);
       await this.checkRateLimit(webhookUrl);
       
       const payload = {
@@ -544,31 +558,20 @@ class EnhancedDiscordService {
       let priceChange = '   0.00%';
       let marketCap = '    0';
       
-      // 使用真實的持倉數據計算價格異動
-      if (changes['15m'] && changes['15m'].positive) {
-        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
-        if (match && match.priceChange !== undefined) {
-          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
-        }
-      }
-      if (changes['15m'] && changes['15m'].negative) {
-        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
-        if (match && match.priceChange !== undefined) {
-          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
-        }
-      }
-      
-      // 獲取總市值（使用24h交易額作為指標）
-      if (changes['15m'] && changes['15m'].positive) {
-        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
-        if (match && match.marketCap) {
-          marketCap = this.formatNumber(match.marketCap).padStart(11);
-        }
-      }
-      if (changes['15m'] && changes['15m'].negative) {
-        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
-        if (match && match.marketCap) {
-          marketCap = this.formatNumber(match.marketCap).padStart(11);
+      // 搜尋所有時間週期的價格變動數據
+      for (const period of periods) {
+        if (changes[period]) {
+          const positiveMatch = changes[period].positive?.find(p => p.symbol === item.symbol);
+          const negativeMatch = changes[period].negative?.find(n => n.symbol === item.symbol);
+          
+          const match = positiveMatch || negativeMatch;
+          if (match && match.priceChange !== undefined) {
+            priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
+            if (match.marketCap) {
+              marketCap = this.formatNumber(match.marketCap).padStart(11);
+            }
+            break; // 找到第一個有效數據就停止
+          }
         }
       }
       
@@ -596,31 +599,20 @@ class EnhancedDiscordService {
       let priceChange = '   0.00%';
       let marketCap = '    0';
       
-      // 使用真實的持倉數據計算價格異動
-      if (changes['15m'] && changes['15m'].positive) {
-        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
-        if (match && match.priceChange !== undefined) {
-          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
-        }
-      }
-      if (changes['15m'] && changes['15m'].negative) {
-        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
-        if (match && match.priceChange !== undefined) {
-          priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
-        }
-      }
-      
-      // 獲取總市值（使用24h交易額作為指標）
-      if (changes['15m'] && changes['15m'].positive) {
-        const match = changes['15m'].positive.find(p => p.symbol === item.symbol);
-        if (match && match.marketCap) {
-          marketCap = this.formatNumber(match.marketCap).padStart(11);
-        }
-      }
-      if (changes['15m'] && changes['15m'].negative) {
-        const match = changes['15m'].negative.find(n => n.symbol === item.symbol);
-        if (match && match.marketCap) {
-          marketCap = this.formatNumber(match.marketCap).padStart(11);
+      // 搜尋所有時間週期的價格變動數據
+      for (const period of periods) {
+        if (changes[period]) {
+          const positiveMatch = changes[period].positive?.find(p => p.symbol === item.symbol);
+          const negativeMatch = changes[period].negative?.find(n => n.symbol === item.symbol);
+          
+          const match = positiveMatch || negativeMatch;
+          if (match && match.priceChange !== undefined) {
+            priceChange = `${match.priceChange > 0 ? '+' : ''}${match.priceChange.toFixed(2)}%`.padStart(8);
+            if (match.marketCap) {
+              marketCap = this.formatNumber(match.marketCap).padStart(11);
+            }
+            break; // 找到第一個有效數據就停止
+          }
         }
       }
       

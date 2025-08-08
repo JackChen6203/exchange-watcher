@@ -11,6 +11,12 @@ class DiscordService {
 
   async sendMessage(content) {
     try {
+      // 如果沒有配置webhook URL，直接返回
+      if (!this.webhookUrl) {
+        console.log('⚠️ Discord webhook未配置，跳過消息發送');
+        return;
+      }
+
       await this.checkRateLimit();
       
       const payload = {
@@ -36,6 +42,12 @@ class DiscordService {
 
   async sendEmbed(embed) {
     try {
+      // 如果沒有配置webhook URL，直接返回
+      if (!this.webhookUrl) {
+        console.log('⚠️ Discord webhook未配置，跳過嵌入消息發送');
+        return;
+      }
+
       await this.checkRateLimit();
       
       const payload = {

@@ -60,8 +60,7 @@ class EnhancedCryptoExchangeMonitor {
     const required = [
       'api.key',
       'api.secret', 
-      'api.passphrase',
-      'discord.webhookUrl'
+      'api.passphrase'
     ];
 
     for (const path of required) {
@@ -72,20 +71,28 @@ class EnhancedCryptoExchangeMonitor {
       }
     }
 
-    // 檢查可選的webhook配置
+    // 檢查Discord配置（現在都是可選的）
     const optionalWebhooks = [
+      'discord.webhookUrl',
       'discord.fundingRateWebhookUrl',
       'discord.positionWebhookUrl', 
       'discord.priceAlertWebhookUrl',
       'discord.swingStrategyWebhookUrl'
     ];
 
+    let hasAnyDiscordConfig = false;
     optionalWebhooks.forEach(path => {
       const value = this.getNestedValue(this.config, path);
-      if (!value) {
-        this.logger.warn(`可選配置未設置，將使用預設webhook: ${path}`);
+      if (value) {
+        hasAnyDiscordConfig = true;
       }
     });
+
+    if (!hasAnyDiscordConfig) {
+      this.logger.warn('⚠️ 未配置任何Discord Webhook，將禁用Discord通知功能');
+    } else {
+      this.logger.info('✅ Discord配置已啟用');
+    }
 
     this.logger.info('配置驗證通過');
     return true;

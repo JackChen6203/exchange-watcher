@@ -356,7 +356,7 @@ class EnhancedContractMonitor {
       this.logger.info('📊 生成持倉異動和資金費率排行報告...');
       
       // 生成持倉異動排行 (正確使用Open Interest數據)
-      const positionChanges = this.calculateOpenInterestChanges();
+      const positionChanges = await this.calculateOpenInterestChanges();
       
       // 生成資金費率排行 (包含持倉異動數據)
       const fundingRateRankings = this.calculateFundingRateWithPositionRankings();
@@ -376,7 +376,7 @@ class EnhancedContractMonitor {
       this.logger.info('💰 生成價格異動排行報告...');
       
       // 生成價格變動排行
-      const priceChanges = this.calculatePriceChanges();
+      const priceChanges = await this.calculatePriceChanges();
       
       // 發送價格異動報告到專用頻道
       await this.discordService.sendPriceChangeReport(priceChanges);
@@ -388,50 +388,83 @@ class EnhancedContractMonitor {
     }
   }
 
-  calculateOpenInterestChanges() {
-    const periods = ['5m', '15m', '1h', '4h'];
+  async calculateOpenInterestChanges() {
+    const periods = [
+      { key: '5m', granularity: '5m', limit: 2 },
+      { key: '15m', granularity: '15m', limit: 2 },
+      { key: '1h', granularity: '1H', limit: 2 },
+      { key: '4h', granularity: '4H', limit: 2 }
+    ];
     const results = {};
     
-    periods.forEach(period => {
+    for (const period of periods) {
       const currentData = this.openInterests.current;
-      const historicalData = this.openInterests[period];
+      const historicalData = this.openInterests[period.key];
       const changes = [];
       
       if (historicalData && historicalData.size > 0) {
-        currentData.forEach((current, symbol) => {
-          const historical = historicalData.get(symbol);
+        // 分批處理以獲取價格數據
+        const batchSize = 10;
+        const symbols = Array.from(currentData.keys());
+        
+        for (let i = 0; i < symbols.length; i += batchSize) {
+          const batch = symbols.slice(i, i + batchSize);
           
-          if (historical && historical.openInterestUsd > 0) {
-            const change = current.openInterestUsd - historical.openInterestUsd;
-            const changePercent = (change / historical.openInterestUsd) * 100;
+          await Promise.all(batch.map(async (symbol) => {
+            const current = currentData.get(symbol);
+            const historical = historicalData.get(symbol);
             
-            // 只記錄有意義的持倉量變動 (大於1%或金額超過$10,000)
-            if (Math.abs(changePercent) > 1 || Math.abs(change) > 10000) {
-              // 獲取當前價格數據和市值
-              const currentPrice = this.priceData.current.get(symbol);
-              const historicalPrice = this.priceData[period]?.get(symbol);
+            if (current && historical && historical.openInterestUsd > 0) {
+              const change = current.openInterestUsd - historical.openInterestUsd;
+              const changePercent = (change / historical.openInterestUsd) * 100;
               
-              let priceChange = 0;
-              if (historicalPrice && historicalPrice.price > 0) {
-                priceChange = ((currentPrice?.price - historicalPrice.price) / historicalPrice.price) * 100;
+              // 只記錄有意義的持倉量變動 (大於1%或金額超過$10,000)
+              if (Math.abs(changePercent) > 1 || Math.abs(change) > 10000) {
+                let priceChange = 0;
+                
+                try {
+                  // 獲取K線數據來計算真實的價格變動
+                  const klineData = await this.bitgetApi.getKline(
+                    symbol, 
+                    'umcbl', 
+                    period.granularity, 
+                    period.limit
+                  );
+                  
+                  if (klineData && klineData.length >= 2) {
+                    const currentPrice = parseFloat(klineData[0][4]); // 最新收盤價
+                    const previousPrice = parseFloat(klineData[1][4]); // 前一根收盤價
+                    
+                    if (currentPrice > 0 && previousPrice > 0) {
+                      priceChange = ((currentPrice - previousPrice) / previousPrice) * 100;
+                    }
+                  }
+                } catch (error) {
+                  this.logger.debug(`⚠️ 獲取 ${symbol} ${period.key} 價格數據失敗:`, error.message);
+                }
+                
+                // 獲取當前價格數據以取得交易量
+                const currentPriceData = this.priceData.current.get(symbol);
+                
+                changes.push({
+                  symbol,
+                  currentOpenInterest: current.openInterestUsd,
+                  previousOpenInterest: historical.openInterestUsd,
+                  change,
+                  changePercent,
+                  priceChange: priceChange || 0,
+                  marketCap: currentPriceData?.volume || 0,
+                  timestamp: Date.now()
+                });
               }
-              
-              // 獲取24h交易額作為市值指標
-              const marketCap = currentPrice?.volume || 0;
-              
-              changes.push({
-                symbol,
-                currentOpenInterest: current.openInterestUsd,
-                previousOpenInterest: historical.openInterestUsd,
-                change,
-                changePercent,
-                priceChange: priceChange || 0,
-                marketCap: marketCap || 0,
-                timestamp: Date.now()
-              });
             }
+          }));
+          
+          // 批次間延遲以避免API限制
+          if (i + batchSize < symbols.length) {
+            await new Promise(resolve => setTimeout(resolve, 200));
           }
-        });
+        }
       }
       
       // 排序：正異動和負異動分別排序
@@ -445,46 +478,82 @@ class EnhancedContractMonitor {
         .sort((a, b) => a.changePercent - b.changePercent)
         .slice(0, 15);
       
-      results[period] = {
+      results[period.key] = {
         positive: positiveChanges,
         negative: negativeChanges
       };
-    });
+      
+      this.logger.debug(`✅ ${period.key} 持倉變動計算完成: 正異動 ${positiveChanges.length} 個, 負異動 ${negativeChanges.length} 個`);
+    }
     
     return results;
   }
 
-  calculatePriceChanges() {
-    const periods = ['5m', '15m', '1h', '4h'];
+  async calculatePriceChanges() {
+    const periods = [
+      { key: '5m', granularity: '5m', limit: 2 },
+      { key: '15m', granularity: '15m', limit: 2 },
+      { key: '1h', granularity: '1H', limit: 2 },
+      { key: '4h', granularity: '4H', limit: 2 }
+    ];
     const results = {};
     
-    periods.forEach(period => {
-      const currentPrices = this.priceData.current;
-      const historicalPrices = this.priceData[period];
+    for (const period of periods) {
       const changes = [];
+      const batchSize = 10;
       
-      if (historicalPrices && historicalPrices.size > 0) {
-        currentPrices.forEach((current, symbol) => {
-          const historical = historicalPrices.get(symbol);
-          
-          if (historical && historical.price > 0) {
-            const change = current.price - historical.price;
-            const changePercent = (change / historical.price) * 100;
+      // 分批處理合約以避免API限制
+      for (let i = 0; i < this.contractSymbols.length; i += batchSize) {
+        const batch = this.contractSymbols.slice(i, i + batchSize);
+        
+        await Promise.all(batch.map(async (contract) => {
+          try {
+            // 獲取K線數據 (最近2根K線)
+            const klineData = await this.bitgetApi.getKline(
+              contract.symbol, 
+              'umcbl', 
+              period.granularity, 
+              period.limit
+            );
             
-            // 只記錄有意義的價格變動 (大於0.5%或絕對值大於$0.001)
-            if (Math.abs(changePercent) > 0.5 || Math.abs(change) > 0.001) {
-              changes.push({
-                symbol,
-                currentPrice: current.price,
-                previousPrice: historical.price,
-                change,
-                changePercent,
-                volume24h: current.volume || 0,
-                timestamp: Date.now()
-              });
+            if (klineData && klineData.length >= 2) {
+              // K線數據格式: [timestamp, open, high, low, close, volume, quoteVolume]
+              const currentCandle = klineData[0]; // 最新的K線
+              const previousCandle = klineData[1]; // 前一根K線
+              
+              const currentPrice = parseFloat(currentCandle[4]); // 收盤價
+              const previousPrice = parseFloat(previousCandle[4]); // 前一根收盤價
+              
+              if (currentPrice > 0 && previousPrice > 0) {
+                const change = currentPrice - previousPrice;
+                const changePercent = (change / previousPrice) * 100;
+                
+                // 只記錄有意義的價格變動 (大於0.5%或絕對值大於$0.001)
+                if (Math.abs(changePercent) > 0.5 || Math.abs(change) > 0.001) {
+                  // 獲取當前價格數據以取得交易量
+                  const currentPriceData = this.priceData.current.get(contract.symbol);
+                  
+                  changes.push({
+                    symbol: contract.symbol,
+                    currentPrice,
+                    previousPrice,
+                    change,
+                    changePercent,
+                    volume24h: currentPriceData?.volume || parseFloat(currentCandle[5]) || 0,
+                    timestamp: Date.now()
+                  });
+                }
+              }
             }
+          } catch (error) {
+            this.logger.debug(`⚠️ 獲取 ${contract.symbol} ${period.key} K線數據失敗:`, error.message);
           }
-        });
+        }));
+        
+        // 批次間延遲以避免API限制
+        if (i + batchSize < this.contractSymbols.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
       }
       
       // 排序：正異動和負異動分別排序
@@ -498,11 +567,13 @@ class EnhancedContractMonitor {
         .sort((a, b) => a.changePercent - b.changePercent)
         .slice(0, 15);
       
-      results[period] = {
+      results[period.key] = {
         positive: positiveChanges,
         negative: negativeChanges
       };
-    });
+      
+      this.logger.debug(`✅ ${period.key} 價格變動計算完成: 正異動 ${positiveChanges.length} 個, 負異動 ${negativeChanges.length} 個`);
+    }
     
     return results;
   }
