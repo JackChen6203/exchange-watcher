@@ -121,7 +121,7 @@ class HealthServer {
   generateStatusPage(status) {
     return `
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -157,7 +157,7 @@ class HealthServer {
         
         <div class="section">
             <h3>🕐 最後更新</h3>
-            <p>${status.timestamp || new Date().toLocaleString('zh-TW')}</p>
+            <p>${status.timestamp || new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}</p>
         </div>
         
         <div class="section">

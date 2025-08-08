@@ -124,7 +124,7 @@ async function testRealReport() {
             await discordService.sendAlert('system_alert', {
                 message: '🧪 真實數據測試成功',
                 level: 'info',
-                details: `持倉數據: ${status.openInterestData} 個\n資金費率數據: ${status.fundingRateData} 個\n測試時間: ${new Date().toLocaleString('zh-TW')}`
+                details: `持倉數據: ${status.openInterestData} 個\n資金費率數據: ${status.fundingRateData} 個\n測試時間: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`
             });
             
             console.log('✅ 測試通知已發送到Discord');

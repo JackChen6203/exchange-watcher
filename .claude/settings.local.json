@@ -17,7 +17,8 @@
       "Bash(npm run build:*)",
       "Bash(find:*)",
       "Bash(node:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(npm run lint:*)"
     ],
     "deny": []
   }

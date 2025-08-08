@@ -165,4 +165,4 @@ node test_real_report.js
 3. 📱 **發送有用信息** - Discord收到實際的市場分析和排行，而非無意義測試消息
 
 ---
-*修復完成時間: ${new Date().toLocaleString('zh-TW')}*
+*修復完成時間: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}*

@@ -161,7 +161,7 @@ class EnhancedCryptoExchangeMonitor {
         fields: [
           {
             name: '測試時間',
-            value: new Date().toLocaleString('zh-TW'),
+            value: new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'}),
             inline: true
           },
           {
@@ -233,7 +233,7 @@ class EnhancedCryptoExchangeMonitor {
       await this.discordService.sendAlert('system_alert', {
         message: '🎉 Digital Ocean 部署成功並完成實際數據測試',
         level: 'info',
-        details: `部署時間: ${new Date().toLocaleString('zh-TW')}\n監控功能已啟動，正在收集實際交易數據`
+        details: `部署時間: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}\n監控功能已啟動，正在收集實際交易數據`
       });
       
     } catch (error) {
@@ -243,7 +243,7 @@ class EnhancedCryptoExchangeMonitor {
       await this.discordService.sendAlert('system_alert', {
         message: '⚠️ Digital Ocean 部署後數據測試失敗',
         level: 'warning', 
-        details: `錯誤: ${error.message}\n時間: ${new Date().toLocaleString('zh-TW')}`
+        details: `錯誤: ${error.message}\n時間: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`
       });
     }
   }

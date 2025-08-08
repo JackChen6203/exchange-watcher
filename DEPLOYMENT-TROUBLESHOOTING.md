@@ -171,4 +171,4 @@ bash scripts/deployment-health-check.sh https://your-app.ondigitalocean.app
 4. 檢查Bitget API狀態和權限
 
 ---
-*問題排查指南更新時間: ${new Date().toLocaleString('zh-TW')}*
+*問題排查指南更新時間: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}*

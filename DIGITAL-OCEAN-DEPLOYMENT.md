@@ -18,7 +18,7 @@ DISCORD_WEBHOOK_URL=your_discord_webhook_url
 ```
 NODE_ENV=production
 PORT=8080
-TZ=Asia/Taipei
+TZ=Asia/Shanghai
 ```
 
 ### 2. 部署配置

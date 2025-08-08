@@ -188,7 +188,7 @@ async function quickRealTest() {
             await discordService.sendAlert('system_alert', {
                 message: '🎉 真實數據測試成功完成',
                 level: 'info',
-                details: `測試了 ${testContracts.length} 個合約\n持倉數據: ${openInterests.size} 個\n資金費率數據: ${fundingRates.size} 個\n持倉異動: 正${positiveChanges.length}個 負${negativeChanges.length}個`
+                details: `測試了 ${testContracts.length} 個合約\n持倉數據: ${openInterests.size} 個\n資金費率數據: ${fundingRates.size} 個\n持倉異動: 正${positiveChanges.length}個 負${negativeChanges.length}個\n測試時間: ${new Date().toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai'})}`
             });
             console.log('✅ 測試完成通知已發送');
             
