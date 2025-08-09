@@ -458,7 +458,8 @@ class BitgetApi {
         const batchPromises = batch.map(async (contract) => {
           try {
             const data = await this.getOpenInterest(contract.symbol, productType);
-            return data && data.openInterestUsd > 0 ? data : null;
+            // 只要有數據就返回，不過濾 openInterestUsd 為 0 的情況
+            return data ? data : null;
           } catch (error) {
             return null;
           }

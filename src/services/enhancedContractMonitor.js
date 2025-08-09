@@ -97,14 +97,48 @@ class EnhancedContractMonitor {
       this.logger.info('📡 加載所有合約交易對...');
       
       const contracts = await this.bitgetApi.getAllContracts('umcbl');
+      console.log(`📡 API 返回合約數量: ${contracts ? contracts.length : 0}`);
+      
+      if (!contracts || contracts.length === 0) {
+        console.log('⚠️ API 返回的合約列表為空');
+        this.contractSymbols = [];
+        return;
+      }
+      
+      // 查看第一個合約的結構
+      if (contracts.length > 0) {
+        console.log('📡 第一個合約數據結構:', JSON.stringify(contracts[0], null, 2));
+      }
+      
       this.contractSymbols = contracts.filter(contract => 
         contract.status === 'normal' && contract.quoteCoin === 'USDT'
       );
       
+      // 如果過濾後為空，嘗試其他可能的字段名稱
+      if (this.contractSymbols.length === 0) {
+        console.log('⚠️ 使用 status=normal 和 quoteCoin=USDT 過濾後為空，嘗試其他條件...');
+        
+        // 嘗試不同的字段名稱組合
+        this.contractSymbols = contracts.filter(contract => 
+          (contract.state === 'normal' || contract.status === 'live') && 
+          (contract.quoteCoin === 'USDT' || contract.quoteCurrency === 'USDT' || contract.settleCoin === 'USDT')
+        );
+        
+        if (this.contractSymbols.length === 0) {
+          // 如果還是為空，只過濾 USDT 相關的
+          this.contractSymbols = contracts.filter(contract => 
+            contract.symbol && contract.symbol.includes('USDT')
+          );
+        }
+      }
+      
+      console.log(`📡 過濾後合約數量: ${this.contractSymbols.length}`);
       this.logger.info(`✅ 成功加載 ${this.contractSymbols.length} 個合約`);
       
     } catch (error) {
+      console.log('❌ 加載合約失敗:', error.message);
       this.logger.error('❌ 加載合約失敗:', error);
+      this.contractSymbols = [];
       throw error;
     }
   }
@@ -117,14 +151,18 @@ class EnhancedContractMonitor {
       const openInterestData = await this.bitgetApi.getAllOpenInterest('umcbl');
       
       // 存儲當前開倉量數據
+      console.log(`📊 準備存儲 ${openInterestData.length} 個開倉量數據到 Map...`);
       openInterestData.forEach(async (data) => {
         this.openInterests.current.set(data.symbol, data);
+        console.log(`📊 已存儲 ${data.symbol} 到 Map，當前 Map 大小: ${this.openInterests.current.size}`);
         try {
           await this.db.saveOpenInterest(data);
         } catch (error) {
           this.logger.debug(`⚠️ 保存 ${data.symbol} 持倉量數據失敗:`, error.message);
         }
       });
+      
+      console.log(`📊 最終 Map 大小: ${this.openInterests.current.size}`);
       
       // 獲取價格數據
       await this.collectPriceData();
@@ -141,6 +179,7 @@ class EnhancedContractMonitor {
 
   async collectPriceData() {
     try {
+      console.log(`📊 開始收集價格數據，合約數量: ${this.contractSymbols.length}`);
       const batchSize = 20; // 增加批次大小以提高效率
       for (let i = 0; i < this.contractSymbols.length; i += batchSize) {
         const batch = this.contractSymbols.slice(i, i + batchSize);
@@ -160,6 +199,7 @@ class EnhancedContractMonitor {
               };
               
               this.priceData.current.set(contract.symbol, priceInfo);
+              console.log(`📊 已存儲 ${contract.symbol} 價格數據到 Map，當前 Map 大小: ${this.priceData.current.size}`);
               await this.db.savePriceData(priceInfo);
             }
           } catch (error) {
@@ -172,6 +212,7 @@ class EnhancedContractMonitor {
           await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
+      console.log(`📊 價格數據收集完成，最終 Map 大小: ${this.priceData.current.size}`);
     } catch (error) {
       this.logger.error('❌ 收集價格數據失敗:', error);
     }

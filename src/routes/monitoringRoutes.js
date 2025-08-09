@@ -320,39 +320,112 @@ class MonitoringRoutes {
         
         console.log('請求參數:', { symbol, changePercent, testSymbol, testChange });
         
-        // 模擬持倉數據
-        const mockPositionData = {
-          openInterestUsd: 1500000000,
-          openInterest: 15789.45
-        };
+        // 檢查是否有真實持倉數據可用
+        const hasRealData = this.contractMonitor.openInterests.current.size > 0;
+        console.log(`系統狀態: ${hasRealData ? '已載入真實數據' : '尚未載入真實數據'}`);
+        console.log(`可用合約數量: ${this.contractMonitor.openInterests.current.size}`);
         
-        // 嘗試從內存獲取真實數據，如果沒有則使用模擬數據
-        let currentPosition = this.contractMonitor.openInterests.current.get(testSymbol);
-        if (!currentPosition) {
-          console.warn(`找不到 ${testSymbol} 的持倉數據，使用模擬數據`);
-          currentPosition = mockPositionData;
+        // 如果沒有真實數據，直接返回錯誤
+        if (!hasRealData) {
+          return res.status(503).json({
+            success: false,
+            error: '系統尚未載入真實數據，請稍後再試',
+            message: 'Real data not available yet, please try again later'
+          });
         }
         
-        // 確保所有數值都有效
-        const baseSize = currentPosition.openInterestUsd || 1500000000;
-        const sizeChange = baseSize * (testChange / 100);
-        const avgPrice = 50000;
+        // 嘗試獲取指定合約的真實數據
+        let currentPosition = this.contractMonitor.openInterests.current.get(testSymbol);
+        let actualSymbol = testSymbol;
         
-        console.log('測試數據:', {
-          symbol: testSymbol,
+        // 如果指定合約沒有數據，使用第一個可用的合約
+        if (!currentPosition && this.contractMonitor.openInterests.current.size > 0) {
+          actualSymbol = this.contractMonitor.openInterests.current.keys().next().value;
+          currentPosition = this.contractMonitor.openInterests.current.get(actualSymbol);
+          console.log(`指定合約 ${testSymbol} 無數據，使用替代合約 ${actualSymbol}`);
+        }
+        
+        // 如果仍然沒有數據，返回錯誤
+        if (!currentPosition) {
+          return res.status(404).json({
+            success: false,
+            error: `找不到合約 ${testSymbol} 的持倉數據`,
+            message: `Position data not found for symbol ${testSymbol}`,
+            availableSymbols: Array.from(this.contractMonitor.openInterests.current.keys()).slice(0, 10)
+          });
+        }
+        
+        // 驗證必要的數據欄位
+        if (!currentPosition.openInterestUsd || typeof currentPosition.openInterestUsd !== 'number') {
+          return res.status(422).json({
+            success: false,
+            error: '持倉數據不完整或無效',
+            message: 'Invalid or incomplete position data',
+            data: currentPosition
+          });
+        }
+        
+        // 使用真實數據計算
+        const baseSize = currentPosition.openInterestUsd;
+        const sizeChange = baseSize * (testChange / 100);
+        const avgPrice = currentPosition.markPrice || null;
+        
+        // 如果沒有價格數據，嘗試從價格數據中獲取
+        let finalPrice = avgPrice;
+        console.log(`📊 初始價格數據: avgPrice=${avgPrice}, actualSymbol=${actualSymbol}`);
+        
+        if (!finalPrice && this.contractMonitor.priceData && this.contractMonitor.priceData.current) {
+          console.log(`📊 嘗試從價格數據 Map 獲取 ${actualSymbol} 的價格`);
+          console.log(`📊 價格數據 Map 大小: ${this.contractMonitor.priceData.current.size}`);
+          
+          const priceData = this.contractMonitor.priceData.current.get(actualSymbol);
+          console.log(`📊 獲取到的價格數據:`, priceData);
+          
+          if (priceData) {
+            finalPrice = priceData?.close || priceData?.price;
+            console.log(`📊 提取的最終價格: ${finalPrice}`);
+          } else {
+            console.log(`📊 未找到 ${actualSymbol} 的價格數據，檢查可用的鍵:`);
+            const availableKeys = Array.from(this.contractMonitor.priceData.current.keys()).slice(0, 10);
+            console.log(`📊 可用的價格數據鍵 (前10個):`, availableKeys);
+          }
+        }
+        
+        if (!finalPrice) {
+          return res.status(422).json({
+            success: false,
+            error: '無法獲取價格數據',
+            message: 'Price data not available',
+            symbol: actualSymbol,
+            debug: {
+              avgPrice,
+              priceDataSize: this.contractMonitor.priceData?.current?.size || 0,
+              availableKeys: this.contractMonitor.priceData?.current ? Array.from(this.contractMonitor.priceData.current.keys()).slice(0, 5) : []
+            }
+          });
+        }
+        
+        console.log('真實數據測試:', {
+          symbol: actualSymbol,
+          originalSymbol: testSymbol,
           baseSize,
           testChange,
           sizeChange,
-          avgPrice
+          avgPrice: finalPrice,
+          rawData: {
+            openInterestUsd: currentPosition.openInterestUsd,
+            openInterest: currentPosition.openInterest,
+            markPrice: currentPosition.markPrice
+          }
         });
         
         const testAlert = {
-          symbol: testSymbol,
+          symbol: actualSymbol,
           sizeChange: sizeChange,
           currentSize: baseSize,
-          avgPrice: avgPrice,
-          pnlChange: sizeChange * 0.1, // 模擬盈虧變化
-          currentPnl: baseSize * 0.05, // 模擬當前盈虧
+          avgPrice: finalPrice,
+          pnlChange: sizeChange * 0.1, // 基於真實數據計算的盈虧變化
+          currentPnl: baseSize * 0.05, // 基於真實數據計算的當前盈虧
           changePercent: testChange,
           changeAmount: sizeChange,
           period: '15m',
