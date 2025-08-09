@@ -312,10 +312,13 @@ class MonitoringRoutes {
     // 測試持倉異動警報API
     this.router.post('/test/position-alert', async (req, res) => {
       try {
+        console.log('=== 測試持倉警報 API 被調用 ===');
         const { symbol, changePercent } = req.body;
         
         const testSymbol = symbol || 'BTCUSDT';
         const testChange = changePercent || (Math.random() > 0.5 ? 15.5 : -12.3);
+        
+        console.log('請求參數:', { symbol, changePercent, testSymbol, testChange });
         
         // 模擬持倉數據
         const mockPositionData = {
@@ -330,11 +333,28 @@ class MonitoringRoutes {
           currentPosition = mockPositionData;
         }
         
+        // 確保所有數值都有效
+        const baseSize = currentPosition.openInterestUsd || 1500000000;
+        const sizeChange = baseSize * (testChange / 100);
+        const avgPrice = 50000;
+        
+        console.log('測試數據:', {
+          symbol: testSymbol,
+          baseSize,
+          testChange,
+          sizeChange,
+          avgPrice
+        });
+        
         const testAlert = {
           symbol: testSymbol,
-          currentOpenInterest: currentPosition.openInterestUsd,
+          sizeChange: sizeChange,
+          currentSize: baseSize,
+          avgPrice: avgPrice,
+          pnlChange: sizeChange * 0.1, // 模擬盈虧變化
+          currentPnl: baseSize * 0.05, // 模擬當前盈虧
           changePercent: testChange,
-          changeAmount: currentPosition.openInterestUsd * (testChange / 100),
+          changeAmount: sizeChange,
           period: '15m',
           timestamp: new Date().toISOString()
         };

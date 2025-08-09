@@ -218,8 +218,16 @@ class EnhancedDiscordService {
 
   createPositionAlertEmbed(data) {
     const { symbol, sizeChange, currentSize, avgPrice, pnlChange, currentPnl } = data;
-    const direction = sizeChange > 0 ? '📈' : '📉';
-    const color = pnlChange > 0 ? 0x00ff00 : 0xff0000;
+    
+    // 確保所有數值都是有效的數字
+    const safeSizeChange = Number(sizeChange) || 0;
+    const safeCurrentSize = Number(currentSize) || 0;
+    const safeAvgPrice = Number(avgPrice) || 0;
+    const safePnlChange = Number(pnlChange) || 0;
+    const safeCurrentPnl = Number(currentPnl) || 0;
+    
+    const direction = safeSizeChange > 0 ? '📈' : '📉';
+    const color = safePnlChange > 0 ? 0x00ff00 : 0xff0000;
 
     return {
       title: `${direction} 持倉警報 - ${symbol}`,
@@ -228,32 +236,32 @@ class EnhancedDiscordService {
       fields: [
         {
           name: '持倉變化',
-          value: `${sizeChange > 0 ? '+' : ''}${sizeChange.toFixed(8)}`,
+          value: `${safeSizeChange > 0 ? '+' : ''}${safeSizeChange.toFixed(8)}`,
           inline: true
         },
         {
           name: '當前持倉',
-          value: currentSize.toFixed(8),
+          value: safeCurrentSize.toFixed(8),
           inline: true
         },
         {
           name: '平均價格',
-          value: `$${avgPrice.toFixed(4)}`,
+          value: `$${safeAvgPrice.toFixed(4)}`,
           inline: true
         },
         {
           name: '盈虧變化',
-          value: `${pnlChange > 0 ? '+' : ''}$${pnlChange.toFixed(2)}`,
+          value: `${safePnlChange > 0 ? '+' : ''}$${safePnlChange.toFixed(2)}`,
           inline: true
         },
         {
           name: '當前盈虧',
-          value: `$${currentPnl.toFixed(2)}`,
+          value: `$${safeCurrentPnl.toFixed(2)}`,
           inline: true
         },
         {
           name: '持倉價值',
-          value: `$${(currentSize * avgPrice).toFixed(2)}`,
+          value: `$${(safeCurrentSize * safeAvgPrice).toFixed(2)}`,
           inline: true
         }
       ],
