@@ -90,9 +90,10 @@ class EnhancedTestSuite {
       
       const embed = discordService.createFundingRateAlertEmbed({ rankings });
       
-      assert.strictEqual(embed.title, '💰 資金費率監控報告');
-      assert(embed.fields.length >= 1, '應該包含資金費率欄位');
-      assert(embed.fields[0].value.includes('BTCUSDT'), '應該包含 BTCUSDT');
+      assert.strictEqual(embed.title, '📊 資金費率排行榜');
+      assert(embed.fields.length >= 2, '應該包含資金費率欄位');
+      // BTCUSDT 在正費率數組中，應該出現在第二個字段 (正費率TOP15)
+      assert(embed.fields[1].value.includes('BTCUSDT'), '應該包含 BTCUSDT');
     });
 
     // 測試波段策略 embed 創建
@@ -128,7 +129,7 @@ class EnhancedTestSuite {
     const api = new BitgetApi(this.testConfig);
 
     // 測試獲取合約列表
-    this.test('獲取合約列表', async () => {
+    await this.test('獲取合約列表', async () => {
       try {
         const contracts = await api.getAllContracts('umcbl');
         assert(Array.isArray(contracts), '應該返回數組');
@@ -168,7 +169,7 @@ class EnhancedTestSuite {
     });
 
     // 測試持倉量變化計算 (使用模擬數據)
-    this.test('持倉量變化計算', () => {
+    await this.test('持倉量變化計算', async () => {
       // 設置模擬數據
       monitor.openInterests.current.set('BTCUSDT', { 
         symbol: 'BTCUSDT', 
@@ -179,24 +180,36 @@ class EnhancedTestSuite {
         openInterestUsd: 900000 
       });
       
-      monitor.priceData.current.set('BTCUSDT', { 
-        symbol: 'BTCUSDT', 
-        price: 45000 
-      });
-      monitor.priceData['15m'].set('BTCUSDT', { 
-        symbol: 'BTCUSDT', 
-        price: 44000 
-      });
+      // Mock bitgetApi.getKline 以避免真實API調用
+      const originalGetKline = monitor.bitgetApi.getKline;
+      monitor.bitgetApi.getKline = async () => {
+        return [
+          [0, 0, 0, 0, '45000'], // 當前價格
+          [0, 0, 0, 0, '44000']  // 歷史價格
+        ];
+      };
       
-      const changes = monitor.calculateOpenInterestChanges();
+      // Mock Discord service 發送以避免真實HTTP請求
+      const originalSendAlert = monitor.discordService.sendAlert;
+      monitor.discordService.sendAlert = async () => {
+        return { success: true };
+      };
       
-      assert(changes['15m'], '應該包含 15m 數據');
-      assert(changes['15m'].positive.length > 0, '應該檢測到正變化');
-      
-      const btcChange = changes['15m'].positive.find(c => c.symbol === 'BTCUSDT');
-      assert(btcChange, '應該包含 BTCUSDT 變化');
-      assert.strictEqual(btcChange.changePercent, (100000/900000) * 100, '變化百分比計算正確');
-      assert(typeof btcChange.currentOpenInterest === 'number', '應該包含當前持倉量');
+      try {
+        const changes = await monitor.calculateOpenInterestChanges();
+        
+        assert(changes['15m'], '應該包含 15m 數據');
+        assert(changes['15m'].positive.length > 0, '應該檢測到正變化');
+        
+        const btcChange = changes['15m'].positive.find(c => c.symbol === 'BTCUSDT');
+        assert(btcChange, '應該包含 BTCUSDT 變化');
+        assert.strictEqual(btcChange.changePercent, (100000/900000) * 100, '變化百分比計算正確');
+        assert(typeof btcChange.currentOpenInterest === 'number', '應該包含當前持倉量');
+      } finally {
+        // 恢復原始方法
+        monitor.bitgetApi.getKline = originalGetKline;
+        monitor.discordService.sendAlert = originalSendAlert;
+      }
     });
 
     console.log('✅ 合約監控測試完成\n');

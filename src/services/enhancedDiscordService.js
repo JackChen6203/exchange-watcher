@@ -23,7 +23,11 @@ class EnhancedDiscordService {
       case 'swing_strategy':
         return this.swingStrategyWebhookUrl;
       default:
-        // 不再提供通用 webhook，每個頻道必須有專用 URL
+        // 為了向後兼容，default 頻道返回通用 webhook URL
+        if (channel === 'default' && this.webhookUrl) {
+          return this.webhookUrl;
+        }
+        // 其他未配置頻道返回 null
         console.warn(`⚠️ 未配置頻道 '${channel}' 的 Discord Webhook URL`);
         return null;
     }
