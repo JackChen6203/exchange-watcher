@@ -1,17 +1,17 @@
 const express = require('express');
-const router = express.Router();
 
 // 監控各個頻道的數據狀態
 class MonitoringRoutes {
   constructor(contractMonitor, discordService) {
     this.contractMonitor = contractMonitor;
     this.discordService = discordService;
+    this.router = express.Router();
     this.setupRoutes();
   }
 
   setupRoutes() {
     // 價格異動監控API
-    router.get('/price-alerts', (req, res) => {
+    this.router.get('/price-alerts', (req, res) => {
       try {
         const priceData = this.contractMonitor.priceData;
         const currentPrices = priceData.current;
@@ -70,7 +70,7 @@ class MonitoringRoutes {
     });
 
     // 持倉異動監控API
-    router.get('/position-changes', (req, res) => {
+    this.router.get('/position-changes', (req, res) => {
       try {
         const openInterests = this.contractMonitor.openInterests;
         const currentData = openInterests.current;
@@ -128,7 +128,7 @@ class MonitoringRoutes {
     });
 
     // 資金費率監控API
-    router.get('/funding-rates', (req, res) => {
+    this.router.get('/funding-rates', (req, res) => {
       try {
         const fundingRates = this.contractMonitor.fundingRates;
         const rankings = this.contractMonitor.calculateFundingRateWithPositionRankings();
@@ -151,7 +151,7 @@ class MonitoringRoutes {
     });
 
     // 波段策略監控API
-    router.get('/swing-strategy', async (req, res) => {
+    this.router.get('/swing-strategy', async (req, res) => {
       try {
         const openInterests = this.contractMonitor.openInterests;
         const eligibleSymbols = Array.from(openInterests.current.entries())
@@ -221,7 +221,7 @@ class MonitoringRoutes {
     });
 
     // 綜合監控狀態API
-    router.get('/status', (req, res) => {
+    this.router.get('/status', (req, res) => {
       try {
         const status = this.contractMonitor.getStatus();
         const priceDataSize = this.contractMonitor.priceData.current.size;
@@ -258,7 +258,7 @@ class MonitoringRoutes {
   }
 
   getRouter() {
-    return router;
+    return this.router;
   }
 }
 
