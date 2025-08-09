@@ -31,13 +31,44 @@ const config = {
       settings: process.env.DISCORD_SETTINGS_ICON_URL || 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/2699.png'
     }
   },
+
+  // Redis 設定 (可選)
+  redis: {
+    enabled: process.env.USE_REDIS === 'true' || false,
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT) || 6379,
+    password: process.env.REDIS_PASSWORD || null,
+    db: parseInt(process.env.REDIS_DB) || 0
+  },
+
+  // 數據庫設定
+  database: {
+    useRedis: process.env.USE_REDIS === 'true' || false,
+    useSqlite: process.env.USE_SQLITE !== 'false' // 預設啟用SQLite
+  },
   
-  // 監控閾值
+  // 監控設定
+  monitoring: {
+    intervals: {
+      dataUpdate: 5 * 60 * 1000,     // 5分鐘更新數據
+      positionReport: 15 * 60 * 1000, // 15分鐘發送持倉報告
+      fundingReport: 60 * 60 * 1000   // 1小時發送資金費率報告
+    },
+    thresholds: {
+      positionChange: 1,              // 持倉變動1%以上才報告（降低門檻）
+      priceChange: 1,                 // 價格變動1%以上才報告（降低門檻）
+      fundingRate: 0.001              // 資金費率0.001%以上才報告（降低門檻）
+    },
+    periods: ['15m', '1h', '4h'],      // 監控時間周期
+    maxSymbols: 100                    // 最多監控交易對數量
+  },
+
+  // 監控閾值（保留向下兼容）
   thresholds: {
-    priceChange: parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 3, // 價格變動百分比(改為3%，更容易觸發)
-    positionChange: parseFloat(process.env.POSITION_CHANGE_THRESHOLD) || 10, // 持倉變動百分比(改為10%)
-    fundingRateHigh: parseFloat(process.env.FUNDING_RATE_HIGH_THRESHOLD) || 0.1, // 資金費率異常高閾值(0.1%)
-    fundingRateLow: parseFloat(process.env.FUNDING_RATE_LOW_THRESHOLD) || -0.1, // 資金費率異常低閾值(-0.1%)
+    priceChange: parseFloat(process.env.PRICE_CHANGE_THRESHOLD) || 1, // 價格變動百分比(降為1%)
+    positionChange: parseFloat(process.env.POSITION_CHANGE_THRESHOLD) || 1, // 持倉變動百分比(降為1%)
+    fundingRateHigh: parseFloat(process.env.FUNDING_RATE_HIGH_THRESHOLD) || 0.05, // 資金費率異常高閾值(0.05%)
+    fundingRateLow: parseFloat(process.env.FUNDING_RATE_LOW_THRESHOLD) || -0.05, // 資金費率異常低閾值(-0.05%)
     updateInterval: parseInt(process.env.UPDATE_INTERVAL) || 5000, // 更新間隔(ms)
     maxChannelsPerConnection: 50, // Bitget建議每個連接訂閱少於50個頻道
     verboseLogging: process.env.VERBOSE_LOGGING === 'true' || false, // 是否啟用詳細日誌

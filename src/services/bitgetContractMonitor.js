@@ -164,10 +164,10 @@ class BitgetContractMonitor {
   }
 
   startPeriodicReporting() {
-    // 每5分鐘發送持倉異動和價格異動報告
+    // 每15分鐘發送持倉異動和價格異動報告
     this.positionPriceReportInterval = setInterval(async () => {
       await this.generateAndSendPositionPriceReport();
-    }, 5 * 60 * 1000); // 5分鐘
+    }, 15 * 60 * 1000); // 15分鐘
     
     // 每小時50分、55分、59分發送資金費率報告
     this.fundingRateReportInterval = setInterval(async () => {
@@ -180,7 +180,7 @@ class BitgetContractMonitor {
     }, 60 * 1000); // 每分鐘檢查一次
     
     this.logger.info('📊 啟動定期報告:');
-    this.logger.info('   - 持倉/價格異動: 每5分鐘');
+    this.logger.info('   - 持倉/價格異動: 每15分鐘');
     this.logger.info('   - 資金費率: 每小時50、55、59分');
   }
 
@@ -798,35 +798,40 @@ ${combinedRows.join('\n')}
 
   async sendPositionChangeTable(analysisData) {
     try {
-      // 獲取所有有持倉變化的數據，按15分鐘持倉變化排序
-      const dataArray = Array.from(analysisData.values())
-        .filter(item => item.positionChanges['15m'])
-        .sort((a, b) => Math.abs(b.positionChanges['15m'].percent) - Math.abs(a.positionChanges['15m'].percent));
+      // 準備時間周期數據
+      const periods = ['15m', '1h', '4h'];
+      const changes = {};
       
-      if (dataArray.length === 0) {
-        this.logger.info('⚠️ 無持倉變化數據');
-        return;
-      }
+      periods.forEach(period => {
+        changes[period] = {
+          positive: [],
+          negative: []
+        };
+        
+        analysisData.forEach((data, symbol) => {
+          if (data.positionChanges[period]) {
+            const changeData = {
+              symbol: symbol,
+              changePercent: data.positionChanges[period].percent,
+              priceChange: data.priceChanges[period]?.percent || 0,
+              marketCap: data.currentPosition || 100000 // 使用持倉量作為市值指標
+            };
+            
+            if (changeData.changePercent > 0) {
+              changes[period].positive.push(changeData);
+            } else if (changeData.changePercent < 0) {
+              changes[period].negative.push(changeData);
+            }
+          }
+        });
+        
+        // 排序
+        changes[period].positive.sort((a, b) => b.changePercent - a.changePercent);
+        changes[period].negative.sort((a, b) => a.changePercent - b.changePercent);
+      });
       
-      // 分離正負異動
-      const positiveChanges = dataArray
-        .filter(item => item.positionChanges['15m'].percent > 0)
-        .slice(0, 8);
-      
-      const negativeChanges = dataArray
-        .filter(item => item.positionChanges['15m'].percent < 0)
-        .slice(0, 8);
-      
-      // 發送正異動表格
-      if (positiveChanges.length > 0) {
-        await this.sendPositionTable('正異動', positiveChanges);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-      
-      // 發送負異動表格
-      if (negativeChanges.length > 0) {
-        await this.sendPositionTable('負異動', negativeChanges);
-      }
+      // 使用新的格式發送
+      await this.discordService.sendPositionChangeReport(changes, 'position');
       
     } catch (error) {
       this.logger.error('❌ 發送持倉異動表格失敗:', error);
@@ -835,35 +840,40 @@ ${combinedRows.join('\n')}
 
   async sendPriceChangeTable(analysisData) {
     try {
-      // 獲取所有有價格變化的數據，按15分鐘價格變化排序
-      const dataArray = Array.from(analysisData.values())
-        .filter(item => item.priceChanges['15m'])
-        .sort((a, b) => Math.abs(b.priceChanges['15m'].percent) - Math.abs(a.priceChanges['15m'].percent));
+      // 準備時間周期數據
+      const periods = ['15m', '1h', '4h'];
+      const priceChanges = {};
       
-      if (dataArray.length === 0) {
-        this.logger.info('⚠️ 無價格變化數據');
-        return;
-      }
+      periods.forEach(period => {
+        priceChanges[period] = {
+          positive: [],
+          negative: []
+        };
+        
+        analysisData.forEach((data, symbol) => {
+          if (data.priceChanges[period]) {
+            const priceData = {
+              symbol: symbol,
+              changePercent: data.priceChanges[period].percent,
+              currentPrice: data.currentPrice,
+              marketCap: data.currentPosition || 100000
+            };
+            
+            if (priceData.changePercent > 0) {
+              priceChanges[period].positive.push(priceData);
+            } else if (priceData.changePercent < 0) {
+              priceChanges[period].negative.push(priceData);
+            }
+          }
+        });
+        
+        // 排序
+        priceChanges[period].positive.sort((a, b) => b.changePercent - a.changePercent);
+        priceChanges[period].negative.sort((a, b) => a.changePercent - b.changePercent);
+      });
       
-      // 分離正負異動
-      const positiveChanges = dataArray
-        .filter(item => item.priceChanges['15m'].percent > 0)
-        .slice(0, 8);
-      
-      const negativeChanges = dataArray
-        .filter(item => item.priceChanges['15m'].percent < 0)
-        .slice(0, 8);
-      
-      // 發送正異動表格
-      if (positiveChanges.length > 0) {
-        await this.sendPriceTable('正異動', positiveChanges);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-      
-      // 發送負異動表格
-      if (negativeChanges.length > 0) {
-        await this.sendPriceTable('負異動', negativeChanges);
-      }
+      // 使用新的格式發送
+      await this.discordService.sendPriceChangeReport(priceChanges);
       
     } catch (error) {
       this.logger.error('❌ 發送價格異動表格失敗:', error);
