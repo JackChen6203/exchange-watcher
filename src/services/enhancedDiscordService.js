@@ -15,15 +15,17 @@ class EnhancedDiscordService {
   getWebhookUrl(channel) {
     switch (channel) {
       case 'funding_rate':
-        return this.fundingRateWebhookUrl || this.webhookUrl;
+        return this.fundingRateWebhookUrl;
       case 'position':
-        return this.positionWebhookUrl || this.webhookUrl;
+        return this.positionWebhookUrl;
       case 'price_alert':
-        return this.priceAlertWebhookUrl || this.webhookUrl;
+        return this.priceAlertWebhookUrl;
       case 'swing_strategy':
-        return this.swingStrategyWebhookUrl || this.webhookUrl;
+        return this.swingStrategyWebhookUrl;
       default:
-        return this.webhookUrl;
+        // 不再提供通用 webhook，每個頻道必須有專用 URL
+        console.warn(`⚠️ 未配置頻道 '${channel}' 的 Discord Webhook URL`);
+        return null;
     }
   }
 

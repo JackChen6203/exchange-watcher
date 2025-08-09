@@ -90,10 +90,24 @@ class CryptoExchangeMonitor {
       }
     }
 
-    // 檢查Discord配置（現在是可選的）
-    const discordUrl = this.getNestedValue(this.config, 'discord.webhookUrl');
-    if (!discordUrl) {
-      console.log('⚠️ 未配置Discord Webhook，將禁用Discord通知功能');
+    // 檢查Discord配置（現在都是可選的）
+    const optionalWebhooks = [
+      'discord.fundingRateWebhookUrl',
+      'discord.positionWebhookUrl', 
+      'discord.priceAlertWebhookUrl',
+      'discord.swingStrategyWebhookUrl'
+    ];
+
+    let hasAnyDiscordConfig = false;
+    optionalWebhooks.forEach(path => {
+      const value = this.getNestedValue(this.config, path);
+      if (value) {
+        hasAnyDiscordConfig = true;
+      }
+    });
+
+    if (!hasAnyDiscordConfig) {
+      console.log('⚠️ 未配置任何Discord Webhook，將禁用Discord通知功能');
     } else {
       console.log('✅ Discord配置已啟用');
     }

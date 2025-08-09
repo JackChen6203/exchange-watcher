@@ -141,7 +141,7 @@ class EnhancedContractMonitor {
 
   async collectPriceData() {
     try {
-      const batchSize = 10;
+      const batchSize = 20; // 增加批次大小以提高效率
       for (let i = 0; i < this.contractSymbols.length; i += batchSize) {
         const batch = this.contractSymbols.slice(i, i + batchSize);
         
@@ -167,9 +167,9 @@ class EnhancedContractMonitor {
           }
         }));
         
-        // 批次間延遲
+        // 減少批次間延遲以加快數據收集
         if (i + batchSize < this.contractSymbols.length) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
     } catch (error) {
@@ -266,9 +266,9 @@ class EnhancedContractMonitor {
       // 更新價格數據
       await this.collectPriceData();
       
-      // 更新資金費率數據 (分批處理)
-      const activeSylmbols = Array.from(this.openInterests.current.keys()).slice(0, 50);
-      const batchSize = 10;
+      // 更新資金費率數據 (分批處理，優化多線程)
+      const activeSylmbols = Array.from(this.openInterests.current.keys()).slice(0, 100); // 增加處理數量
+      const batchSize = 20; // 增加批次大小
       
       for (let i = 0; i < activeSylmbols.length; i += batchSize) {
         const batch = activeSylmbols.slice(i, i + batchSize);
@@ -282,8 +282,8 @@ class EnhancedContractMonitor {
           }
         }));
         
-        // 批次間延遲
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // 減少批次間延遲以加快數據收集
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
       
       this.logger.debug('✅ 合約數據更新完成');

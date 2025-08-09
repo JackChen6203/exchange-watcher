@@ -73,7 +73,6 @@ class EnhancedCryptoExchangeMonitor {
 
     // 檢查Discord配置（現在都是可選的）
     const optionalWebhooks = [
-      'discord.webhookUrl',
       'discord.fundingRateWebhookUrl',
       'discord.positionWebhookUrl', 
       'discord.priceAlertWebhookUrl',
@@ -238,6 +237,23 @@ class EnhancedCryptoExchangeMonitor {
             await this.contractMonitor.testPriceAlert();
             this.logger.console('✅ 價格警報測試完成');
           }
+          
+          // 測試波段策略功能
+          this.logger.console('📈 測試波段策略分析功能...');
+          await this.contractMonitor.performSwingStrategyAnalysis();
+          this.logger.console('✅ 波段策略測試完成');
+          
+          // 發送測試完成的波段策略信號
+          await this.discordService.sendAlert('swing_strategy_alert', {
+            symbol: 'BTCUSDT',
+            strategy: 'bullish',
+            price: 50000,
+            ema30: 49500,
+            ema55: 49000,
+            candleType: '看漲吞沒',
+            timestamp: Date.now()
+          });
+          this.logger.console('✅ 波段策略測試信號已發送');
         } else {
           this.logger.warn('⚠️ 未收集到實際數據，可能是API配置問題');
         }
