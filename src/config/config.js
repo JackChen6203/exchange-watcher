@@ -51,7 +51,7 @@ const config = {
   monitoring: {
     intervals: {
       dataUpdate: 5 * 60 * 1000,     // 5分鐘更新數據
-      positionReport: 15 * 60 * 1000, // 15分鐘發送持倉報告
+      positionReport: 5 * 60 * 1000,  // 5分鐘發送持倉報告
       fundingReport: 60 * 60 * 1000   // 1小時發送資金費率報告
     },
     thresholds: {
@@ -72,7 +72,7 @@ const config = {
     updateInterval: parseInt(process.env.UPDATE_INTERVAL) || 5000, // 更新間隔(ms)
     maxChannelsPerConnection: 50, // Bitget建議每個連接訂閱少於50個頻道
     verboseLogging: process.env.VERBOSE_LOGGING === 'true' || false, // 是否啟用詳細日誌
-    reportInterval: 15 * 60 * 1000, // 15分鐘報告間隔
+    reportInterval: 5 * 60 * 1000,  // 5分鐘報告間隔
     monitorInterval: 5 * 60 * 1000 // 5分鐘監控間隔
   },
   

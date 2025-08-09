@@ -164,10 +164,10 @@ class BitgetContractMonitor {
   }
 
   startPeriodicReporting() {
-    // 每15分鐘發送持倉異動和價格異動報告
+    // 每5分鐘發送持倉異動和價格異動報告
     this.positionPriceReportInterval = setInterval(async () => {
       await this.generateAndSendPositionPriceReport();
-    }, 15 * 60 * 1000); // 15分鐘
+    }, 5 * 60 * 1000); // 5分鐘
     
     // 每小時50分、55分、59分發送資金費率報告
     this.fundingRateReportInterval = setInterval(async () => {
@@ -180,7 +180,7 @@ class BitgetContractMonitor {
     }, 60 * 1000); // 每分鐘檢查一次
     
     this.logger.info('📊 啟動定期報告:');
-    this.logger.info('   - 持倉/價格異動: 每15分鐘');
+    this.logger.info('   - 持倉/價格異動: 每5分鐘');
     this.logger.info('   - 資金費率: 每小時50、55、59分');
   }
 
