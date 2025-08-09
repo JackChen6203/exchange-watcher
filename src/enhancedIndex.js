@@ -2,6 +2,8 @@ const config = require('./config/config');
 const EnhancedDiscordService = require('./services/enhancedDiscordService');
 const EnhancedContractMonitor = require('./services/enhancedContractMonitor');
 const Logger = require('./utils/logger');
+const express = require('express');
+const MonitoringRoutes = require('./routes/monitoringRoutes');
 
 class EnhancedCryptoExchangeMonitor {
   constructor() {
@@ -10,6 +12,43 @@ class EnhancedCryptoExchangeMonitor {
     this.discordService = new EnhancedDiscordService(config);
     this.contractMonitor = new EnhancedContractMonitor(config, this.discordService);
     this.isRunning = false;
+    this.app = express();
+    this.server = null;
+    this.setupExpressServer();
+  }
+
+  setupExpressServer() {
+    // 設置中間件
+    this.app.use(express.json());
+    
+    // 健康檢查端點
+    this.app.get('/health', (req, res) => {
+      const status = this.contractMonitor.getStatus();
+      res.json({
+        status: 'healthy',
+        service: '加密貨幣交易所監控系統',
+        version: '1.0.0',
+        monitoring: {
+          isRunning: status.isRunning,
+          startTime: status.startTime
+        },
+        contract: {
+          isRunning: this.contractMonitor.openInterests.current.size > 0,
+          symbols: this.contractMonitor.openInterests.current.size
+        },
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    // 設置監控路由
+    const monitoringRoutes = new MonitoringRoutes(this.contractMonitor, this.discordService);
+    this.app.use('/api/monitoring', monitoringRoutes.getRouter());
+    
+    // 啟動服務器
+    const port = process.env.PORT || 3000;
+    this.server = this.app.listen(port, () => {
+      this.logger.console(`🌐 監控API服務器啟動在端口 ${port}`);
+    });
   }
 
   async start() {
@@ -107,6 +146,13 @@ class EnhancedCryptoExchangeMonitor {
       
       try {
         this.isRunning = false;
+        
+        // 停止Express服務器
+        if (this.server) {
+          this.server.close(() => {
+            this.logger.console('🌐 Express服務器已關閉');
+          });
+        }
         
         if (this.contractMonitor) {
           this.contractMonitor.stop();
@@ -241,19 +287,7 @@ class EnhancedCryptoExchangeMonitor {
           // 測試波段策略功能
           this.logger.console('📈 測試波段策略分析功能...');
           await this.contractMonitor.performSwingStrategyAnalysis();
-          this.logger.console('✅ 波段策略測試完成');
-          
-          // 發送測試完成的波段策略信號
-          await this.discordService.sendAlert('swing_strategy_alert', {
-            symbol: 'BTCUSDT',
-            strategy: 'bullish',
-            price: 50000,
-            ema30: 49500,
-            ema55: 49000,
-            candleType: '看漲吞沒',
-            timestamp: Date.now()
-          });
-          this.logger.console('✅ 波段策略測試信號已發送');
+          this.logger.console('✅ 波段策略測試完成 - 使用真實市場數據分析');
         } else {
           this.logger.warn('⚠️ 未收集到實際數據，可能是API配置問題');
         }

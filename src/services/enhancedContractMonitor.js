@@ -314,10 +314,17 @@ class EnhancedContractMonitor {
       this.logger.debug('📦 備份15分鐘數據');
     }
     
+    // 30分鐘備份 - 新增用於價格監控
+    if (this.shouldBackupPeriod('30m', now)) {
+      this.openInterests['30m'] = new Map(this.openInterests['15m'] || currentData);
+      this.priceData['30m'] = new Map(this.priceData['15m'] || currentPriceData);
+      this.logger.debug('📦 備份30分鐘數據');
+    }
+    
     // 1小時備份
     if (this.shouldBackupPeriod('1h', now)) {
-      this.openInterests['1h'] = new Map(this.openInterests['15m'] || currentData);
-      this.priceData['1h'] = new Map(this.priceData['15m'] || currentPriceData);
+      this.openInterests['1h'] = new Map(this.openInterests['30m'] || currentData);
+      this.priceData['1h'] = new Map(this.priceData['30m'] || currentPriceData);
       this.logger.debug('📦 備份1小時數據');
     }
     
@@ -337,6 +344,7 @@ class EnhancedContractMonitor {
     const intervals = {
       '5m': 5 * 60 * 1000,
       '15m': 15 * 60 * 1000,
+      '30m': 30 * 60 * 1000,
       '1h': 60 * 60 * 1000,
       '4h': 4 * 60 * 60 * 1000
     };
@@ -446,7 +454,7 @@ class EnhancedContractMonitor {
                 // 獲取當前價格數據以取得交易量
                 const currentPriceData = this.priceData.current.get(symbol);
                 
-                changes.push({
+                const changeData = {
                   symbol,
                   currentOpenInterest: current.openInterestUsd,
                   previousOpenInterest: historical.openInterestUsd,
@@ -454,8 +462,21 @@ class EnhancedContractMonitor {
                   changePercent,
                   priceChange: priceChange || 0,
                   marketCap: currentPriceData?.volume || 0,
-                  timestamp: Date.now()
-                });
+                  timestamp: Date.now(),
+                  period: period.key
+                };
+                
+                changes.push(changeData);
+                
+                // 發送即時持倉異動警報 (僅針對顯著變動)
+                if (Math.abs(changePercent) > 5 || Math.abs(change) > 50000) {
+                  this.logger.info(`🚨 發送持倉異動警報: ${symbol} ${period.key} 變動 ${changePercent.toFixed(2)}%`);
+                  
+                  await this.discordService.sendAlert('position_alert', {
+                    ...changeData,
+                    price: currentPriceData?.price || 0
+                  });
+                }
               }
             }
           }));
@@ -619,37 +640,54 @@ class EnhancedContractMonitor {
       
       this.logger.debug(`🔍 監控價格變動 - 閾值: ${threshold}%, 當前價格數據: ${currentPrices.size} 個`);
       
+      // 確保有足夠的歷史數據
+      if (!this.priceData['15m'] || this.priceData['15m'].size === 0) {
+        this.logger.debug('⏳ 等待歷史價格數據收集完成...');
+        return;
+      }
+      
       for (const [symbol, currentPrice] of currentPrices) {
         // 檢查各個時間週期的價格變動
         const periods = ['15m', '30m', '1h', '4h'];
         const priceChanges = {};
         let hasSignificantChange = false;
         let maxChange = 0;
+        let maxPeriod = '';
         
         for (const period of periods) {
           const historicalPrice = this.priceData[period]?.get(symbol);
-          if (historicalPrice) {
+          if (historicalPrice && historicalPrice.price) {
             const change = ((currentPrice.price - historicalPrice.price) / historicalPrice.price) * 100;
             priceChanges[period] = change;
-            maxChange = Math.max(maxChange, Math.abs(change));
+            
+            if (Math.abs(change) > Math.abs(maxChange)) {
+              maxChange = change;
+              maxPeriod = period;
+            }
             
             if (Math.abs(change) > threshold) {
               hasSignificantChange = true;
               this.logger.debug(`📈 ${symbol} ${period} 變動 ${change.toFixed(2)}% 超過閾值`);
             }
+          } else {
+            this.logger.debug(`⚠️ ${symbol} 缺少 ${period} 歷史價格數據`);
           }
         }
         
         // 如果有顯著價格變動，發送警報
         if (hasSignificantChange) {
-          this.logger.info(`🚨 發送價格警報: ${symbol} 最大變動 ${maxChange.toFixed(2)}%`);
+          this.logger.info(`🚨 發送價格警報: ${symbol} 最大變動 ${maxChange.toFixed(2)}% (${maxPeriod})`);
           
           await this.discordService.sendAlert('price_alert', {
             symbol,
             price: currentPrice.price,
             changePercent: currentPrice.change24h,
             volume24h: currentPrice.volume,
-            priceChanges
+            high24h: currentPrice.high24h,
+            low24h: currentPrice.low24h,
+            priceChanges,
+            maxChange,
+            maxPeriod
           });
           
           alertCount++;
