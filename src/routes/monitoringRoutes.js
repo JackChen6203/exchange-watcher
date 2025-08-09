@@ -255,6 +255,406 @@ class MonitoringRoutes {
         });
       }
     });
+
+    // 測試價格異動警報API
+    this.router.post('/test/price-alert', async (req, res) => {
+      try {
+        const { symbol, changePercent } = req.body;
+        
+        // 使用真實數據或測試數據
+        const testSymbol = symbol || 'BTCUSDT';
+        const testChange = changePercent || (Math.random() > 0.5 ? 5.2 : -4.8);
+        
+        // 模擬價格數據（因為價格數據收集可能還未完成）
+        const mockPriceData = {
+          price: 95000.50,
+          change24h: 5.25,
+          volume: 1234567890
+        };
+        
+        // 嘗試從內存獲取真實數據，如果沒有則使用模擬數據
+        let currentPrice = this.contractMonitor.priceData.current.get(testSymbol);
+        if (!currentPrice) {
+          console.warn(`找不到 ${testSymbol} 的價格數據，使用模擬數據`);
+          currentPrice = mockPriceData;
+        }
+        
+        const testAlert = {
+          symbol: testSymbol,
+          price: currentPrice.price,
+          changePercent: testChange,
+          volume24h: currentPrice.volume || 1000000,
+          priceChanges: {
+            '15m': (Math.random() - 0.5) * 2,
+            '30m': (Math.random() - 0.5) * 4,
+            '1h': (Math.random() - 0.5) * 6,
+            '4h': (Math.random() - 0.5) * 8
+          },
+          timestamp: new Date().toISOString()
+        };
+        
+        // 發送到Discord
+        await this.discordService.sendAlert('price_alert', testAlert);
+        
+        res.json({
+          status: 'success',
+          message: '價格異動測試警報已發送',
+          data: testAlert
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          error: error.message
+        });
+      }
+    });
+
+    // 測試持倉異動警報API
+    this.router.post('/test/position-alert', async (req, res) => {
+      try {
+        const { symbol, changePercent } = req.body;
+        
+        const testSymbol = symbol || 'BTCUSDT';
+        const testChange = changePercent || (Math.random() > 0.5 ? 15.5 : -12.3);
+        
+        // 模擬持倉數據
+        const mockPositionData = {
+          openInterestUsd: 1500000000,
+          openInterest: 15789.45
+        };
+        
+        // 嘗試從內存獲取真實數據，如果沒有則使用模擬數據
+        let currentPosition = this.contractMonitor.openInterests.current.get(testSymbol);
+        if (!currentPosition) {
+          console.warn(`找不到 ${testSymbol} 的持倉數據，使用模擬數據`);
+          currentPosition = mockPositionData;
+        }
+        
+        const testAlert = {
+          symbol: testSymbol,
+          currentOpenInterest: currentPosition.openInterestUsd,
+          changePercent: testChange,
+          changeAmount: currentPosition.openInterestUsd * (testChange / 100),
+          period: '15m',
+          timestamp: new Date().toISOString()
+        };
+        
+        // 發送到Discord
+        await this.discordService.sendAlert('position_alert', testAlert);
+        
+        res.json({
+          status: 'success',
+          message: '持倉異動測試警報已發送',
+          data: testAlert
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          error: error.message
+        });
+      }
+    });
+
+    // 測試波段策略警報API
+    this.router.post('/test/swing-strategy', async (req, res) => {
+      try {
+        const { symbol, trend } = req.body;
+        
+        const testSymbol = symbol || 'ETHUSDT';
+        const testTrend = trend || (Math.random() > 0.5 ? 'bullish' : 'bearish');
+        
+        // 模擬價格數據
+        const mockPriceData = {
+          price: 3500.75
+        };
+        
+        // 嘗試從內存獲取真實數據，如果沒有則使用模擬數據
+        let currentPrice = this.contractMonitor.priceData.current.get(testSymbol);
+        if (!currentPrice) {
+          console.warn(`找不到 ${testSymbol} 的價格數據，使用模擬數據`);
+          currentPrice = mockPriceData;
+        }
+        
+        const testAlert = {
+          symbol: testSymbol,
+          price: currentPrice.price,
+          trend: testTrend,
+          ema12: currentPrice.price * 1.001,
+          ema30: currentPrice.price * 0.999,
+          ema55: currentPrice.price * 0.998,
+          signal: testTrend === 'bullish' ? '多頭排列' : '空頭排列',
+          timestamp: new Date().toISOString()
+        };
+        
+        // 發送到Discord
+        await this.discordService.sendAlert('swing_strategy_alert', testAlert);
+        
+        res.json({
+          status: 'success',
+          message: '波段策略測試警報已發送',
+          data: testAlert
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          error: error.message
+        });
+      }
+    });
+
+    // 測試表格格式報告API
+    this.router.post('/test/table-report', async (req, res) => {
+      try {
+        const { type } = req.body;
+        const reportType = type || 'position';
+        
+        if (reportType === 'position') {
+          // 測試持倉變動表格
+          const testData = [];
+          const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'DOTUSDT'];
+          
+          for (let i = 0; i < symbols.length; i++) {
+            const symbol = symbols[i];
+            // 嘗試從內存獲取真實數據，如果沒有則使用模擬數據
+            let current = this.contractMonitor.openInterests.current.get(symbol);
+            if (!current) {
+              console.warn(`找不到 ${symbol} 的持倉數據，使用模擬數據`);
+              current = {
+                openInterestUsd: Math.random() * 1000000000 + 100000000
+              };
+            }
+            
+            testData.push({
+              symbol,
+              currentOpenInterest: current.openInterestUsd,
+              change15m: (Math.random() - 0.5) * 20,
+              change1h: (Math.random() - 0.5) * 30,
+              change4h: (Math.random() - 0.5) * 50,
+              change1d: (Math.random() - 0.5) * 80
+            });
+          }
+          
+          // 生成表格格式
+          const tableRows = testData.map((item, index) => {
+            const rank = (index + 1).toString().padStart(2);
+            const symbol = item.symbol.padEnd(12);
+            const current = this.formatNumber(item.currentOpenInterest);
+            const change15m = this.formatChangePercent(item.change15m);
+            const change1h = this.formatChangePercent(item.change1h);
+            const change4h = this.formatChangePercent(item.change4h);
+            const change1d = this.formatChangePercent(item.change1d);
+            
+            return `${rank} | ${symbol} | ${current} | ${change15m} | ${change1h} | ${change4h} | ${change1d}`;
+          }).join('\n');
+          
+          const tableContent = `\`\`\`
+📈 持倉量變動排行 TOP5 (測試數據)
+
+排名 | 交易對      | 當前持倉   | 15分    | 1時     | 4時     | 日線
+-----|-----------|----------|---------|---------|---------|--------
+${tableRows}
+\`\`\``;
+          
+          await this.discordService.sendMessage(tableContent, 'position');
+          
+          res.json({
+            status: 'success',
+            message: '持倉變動表格測試報告已發送',
+            tableContent
+          });
+          
+        } else if (reportType === 'price') {
+          // 測試價格變動表格
+          const testData = [];
+          const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'DOTUSDT'];
+          
+          for (let i = 0; i < symbols.length; i++) {
+            const symbol = symbols[i];
+            // 嘗試從內存獲取真實數據，如果沒有則使用模擬數據
+            let current = this.contractMonitor.priceData.current.get(symbol);
+            if (!current) {
+              console.warn(`找不到 ${symbol} 的價格數據，使用模擬數據`);
+              current = {
+                price: Math.random() * 100000 + 1000
+              };
+            }
+            
+            testData.push({
+              symbol,
+              price: current.price,
+              change15m: (Math.random() - 0.5) * 10,
+              change1h: (Math.random() - 0.5) * 15,
+              change4h: (Math.random() - 0.5) * 25,
+              change1d: (Math.random() - 0.5) * 40
+            });
+          }
+          
+          const tableRows = testData.map((item, index) => {
+            const rank = (index + 1).toString().padStart(2);
+            const symbol = item.symbol.padEnd(12);
+            const price = `$${item.price.toFixed(4)}`;
+            const change15m = this.formatChangePercent(item.change15m);
+            const change1h = this.formatChangePercent(item.change1h);
+            const change4h = this.formatChangePercent(item.change4h);
+            const change1d = this.formatChangePercent(item.change1d);
+            
+            return `${rank} | ${symbol} | ${price} | ${change15m} | ${change1h} | ${change4h} | ${change1d}`;
+          }).join('\n');
+          
+          const tableContent = `\`\`\`
+📊 價格變動排行 TOP5 (測試數據)
+
+排名 | 交易對      | 當前價格   | 15分    | 1時     | 4時     | 日線
+-----|-----------|----------|---------|---------|---------|--------
+${tableRows}
+\`\`\``;
+          
+          await this.discordService.sendMessage(tableContent, 'price_alert');
+          
+          res.json({
+            status: 'success',
+            message: '價格變動表格測試報告已發送',
+            tableContent
+          });
+        }
+        
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          error: error.message
+        });
+      }
+    });
+
+    // 測試Webhook連接API
+    this.router.post('/test/webhook', async (req, res) => {
+      try {
+        const { channel } = req.body;
+        const testChannel = channel || 'price_alert';
+        
+        const webhookUrl = this.discordService.getWebhookUrl(testChannel);
+        if (!webhookUrl) {
+          return res.status(400).json({
+            status: 'error',
+            message: `頻道 ${testChannel} 的 Webhook URL 未配置`
+          });
+        }
+        
+        const testMessage = {
+          title: '🧪 Webhook 連接測試',
+          description: `這是一個測試訊息，用於驗證 ${testChannel} 頻道的 Discord Webhook 連接。`,
+          color: 0x00ff00,
+          timestamp: new Date().toISOString(),
+          fields: [
+            {
+              name: '測試時間',
+              value: new Date().toLocaleString('zh-TW'),
+              inline: true
+            },
+            {
+              name: '頻道',
+              value: testChannel,
+              inline: true
+            },
+            {
+              name: '狀態',
+              value: '✅ 連接正常',
+              inline: true
+            }
+          ]
+        };
+        
+        await this.discordService.sendEmbed(testMessage, testChannel);
+        
+        res.json({
+          status: 'success',
+          message: `Webhook 測試訊息已發送到 ${testChannel} 頻道`,
+          webhookUrl: webhookUrl.substring(0, 50) + '...' // 只顯示部分URL保護隱私
+        });
+        
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          error: error.message
+        });
+      }
+    });
+
+    // 測試Bitget API連接
+    this.router.get('/test/bitget-connection', async (req, res) => {
+      try {
+        const connectionTest = await this.contractMonitor.bitgetApi.testConnection();
+        
+        if (connectionTest) {
+          // 測試獲取真實數據
+          const testSymbol = 'BTCUSDT';
+          const ticker = await this.contractMonitor.bitgetApi.getTicker(testSymbol, 'umcbl');
+          const openInterest = await this.contractMonitor.bitgetApi.getOpenInterest(testSymbol, 'umcbl');
+          const fundingRate = await this.contractMonitor.bitgetApi.getFundingRate(testSymbol, 'umcbl');
+          
+          res.json({
+            status: 'success',
+            message: 'Bitget API 連接正常',
+            testData: {
+              symbol: testSymbol,
+              ticker: {
+                price: ticker?.lastPr,
+                change24h: ticker?.chgUtc,
+                volume: ticker?.baseVolume
+              },
+              openInterest: {
+                amount: openInterest?.amount,
+                amountUsd: openInterest?.amountUsd
+              },
+              fundingRate: {
+                rate: fundingRate?.fundingRate,
+                nextSettleTime: fundingRate?.nextSettleTime
+              }
+            },
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          res.status(500).json({
+            status: 'error',
+            message: 'Bitget API 連接失敗'
+          });
+        }
+        
+      } catch (error) {
+        res.status(500).json({
+          status: 'error',
+          error: error.message
+        });
+      }
+    });
+  }
+
+  // 格式化數字顯示
+  formatNumber(num) {
+    // 檢查參數有效性
+    if (num === undefined || num === null || isNaN(num)) {
+      return '0.00';
+    }
+    
+    if (num >= 1000000000) {
+      return (num / 1000000000).toFixed(2) + 'B';
+    } else if (num >= 1000000) {
+      return (num / 1000000).toFixed(2) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(2) + 'K';
+    }
+    return num.toFixed(2);
+  }
+
+  // 格式化變動百分比
+  formatChangePercent(changePercent) {
+    // 檢查參數有效性
+    if (changePercent === undefined || changePercent === null || isNaN(changePercent)) {
+      return '0.00%';
+    }
+    
+    const sign = changePercent >= 0 ? '+' : '';
+    return `${sign}${changePercent.toFixed(2)}%`;
   }
 
   getRouter() {
