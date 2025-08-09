@@ -451,6 +451,7 @@ class EnhancedContractMonitor {
       const historicalData = this.openInterests[period.key];
       const changes = [];
       
+      // 只使用真實的歷史數據，不使用模擬數據
       if (historicalData && historicalData.size > 0) {
         // 分批處理以獲取價格數據
         const batchSize = 10;
@@ -467,8 +468,9 @@ class EnhancedContractMonitor {
               const change = current.openInterestUsd - historical.openInterestUsd;
               const changePercent = (change / historical.openInterestUsd) * 100;
               
-              // 只記錄有意義的持倉量變動 (大於1%或金額超過$10,000)
-              if (Math.abs(changePercent) > 1 || Math.abs(change) > 10000) {
+              // 持倉變動過濾條件：移除門檻限制，收集所有變動數據用於排行
+              if (true) {
+                this.logger.debug(`📊 ${symbol} ${period.key} 變動: ${changePercent.toFixed(2)}%, 金額: $${change.toFixed(2)}`);
                 let priceChange = 0;
                 
                 try {

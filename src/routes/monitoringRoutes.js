@@ -69,53 +69,119 @@ class MonitoringRoutes {
       }
     });
 
-    // 持倉異動監控API
-    this.router.get('/position-changes', (req, res) => {
+    // 持倉異動監控API - 返回表格格式
+    this.router.get('/position-changes', async (req, res) => {
       try {
-        const openInterests = this.contractMonitor.openInterests;
-        const currentData = openInterests.current;
-        const periods = [
-          { key: '15m', name: '15分鐘' },
-          { key: '30m', name: '30分鐘' },
-          { key: '1h', name: '1小時' },
-          { key: '4h', name: '4小時' }
-        ];
+        // 使用 enhancedContractMonitor 的方法獲取持倉異動數據
+        const positionChanges = await this.contractMonitor.calculateOpenInterestChanges();
+        console.log('📊 calculateOpenInterestChanges 返回數據:', JSON.stringify(positionChanges, null, 2));
         
-        const changes = [];
+        // 整合不同時間周期的數據
+        const symbolData = new Map();
         
+        // 處理每個時間周期的數據
+        const periods = ['15m', '1h', '4h'];
         for (const period of periods) {
-          const historicalData = openInterests[period.key];
-          if (historicalData && historicalData.size > 0) {
-            for (const [symbol, current] of currentData) {
-              const historical = historicalData.get(symbol);
-              if (current && historical && historical.openInterestUsd > 0) {
-                const change = current.openInterestUsd - historical.openInterestUsd;
-                const changePercent = (change / historical.openInterestUsd) * 100;
-                
-                // 只記錄有意義的持倉量變動 (大於1%或金額超過$10,000)
-                if (Math.abs(changePercent) > 1 || Math.abs(change) > 10000) {
-                  changes.push({
-                    symbol,
-                    period: period.key,
-                    periodName: period.name,
-                    currentOpenInterest: current.openInterestUsd,
-                    historicalOpenInterest: historical.openInterestUsd,
-                    change,
-                    changePercent,
-                    timestamp: new Date().toISOString()
+          if (positionChanges[period]) {
+            // 處理正異動
+            if (positionChanges[period].positive) {
+              for (const item of positionChanges[period].positive) {
+                if (!symbolData.has(item.symbol)) {
+                  symbolData.set(item.symbol, {
+                    symbol: item.symbol,
+                    priceChange: item.priceChange || 0,
+                    marketCap: 0, // 總市值暫時設為0
+                    positions: {}
                   });
                 }
+                symbolData.get(item.symbol).positions[period] = item.changePercent;
+              }
+            }
+            
+            // 處理負異動
+            if (positionChanges[period].negative) {
+              for (const item of positionChanges[period].negative) {
+                if (!symbolData.has(item.symbol)) {
+                  symbolData.set(item.symbol, {
+                    symbol: item.symbol,
+                    priceChange: item.priceChange || 0,
+                    marketCap: 0, // 總市值暫時設為0
+                    positions: {}
+                  });
+                }
+                symbolData.get(item.symbol).positions[period] = item.changePercent;
               }
             }
           }
         }
         
+        // 轉換為數組並按15分鐘持倉變化排序
+        const allChanges = Array.from(symbolData.values())
+          .filter(item => item.positions['15m'] !== undefined)
+          .map(item => {
+            // 嘗試獲取當前價格數據
+            const priceData = this.contractMonitor.priceData.current.get(item.symbol);
+            const currentPrice = priceData ? (priceData.price || priceData.close) : 0;
+            
+            // 計算市值（使用持倉量 * 價格）
+            const openInterestData = this.contractMonitor.openInterests.current.get(item.symbol);
+            const marketCapValue = openInterestData && currentPrice ? 
+              (openInterestData.openInterestUsd / 1000000) : 0; // 轉換為百萬單位
+            
+            return {
+              symbol: item.symbol,
+              priceChange: priceData ? (priceData.change24h || 0) : 0,
+              marketCap: marketCapValue,
+              pos15m: item.positions['15m'] || 0,
+              pos1h: item.positions['1h'] || 0,
+              pos4h: item.positions['4h'] || 0
+            };
+          });
+        
+        // 分離正異動和負異動
+        const positiveChanges = allChanges
+          .filter(item => item.pos15m > 0)
+          .sort((a, b) => b.pos15m - a.pos15m)
+          .slice(0, 8);
+          
+        const negativeChanges = allChanges
+          .filter(item => item.pos15m < 0)
+          .sort((a, b) => a.pos15m - b.pos15m)
+          .slice(0, 8);
+        
+        // 格式化表格
+        const formatTable = (data, type) => {
+          const rows = data.map((item, index) => {
+            const rank = (index + 1).toString().padStart(2);
+            const symbol = item.symbol.padEnd(12);
+            const priceChange = this.formatPercent(item.priceChange).padStart(8);
+            const marketCap = this.formatPercent(item.marketCap).padStart(8);
+            const pos15m = this.formatPercent(item.pos15m).padStart(9);
+            const pos1h = this.formatPercent(item.pos1h).padStart(9);
+            const pos4h = this.formatPercent(item.pos4h).padStart(9);
+            
+            return `  ${rank} | ${symbol} | ${priceChange} | ${marketCap} | ${pos15m} | ${pos1h} | ${pos4h}`;
+          }).join('\n');
+          
+          return `📊 持倉異動排行 ${type} TOP8 (各時間周期對比)\n\n排名 | 幣種          | 價格異動  | 總市值  | 15分持倉 | 1h持倉   | 4h持倉\n-----|-------------|----------|----------|----------|----------|----------\n${rows}`;
+        };
+        
+        const positiveTable = formatTable(positiveChanges, '正異動');
+        const negativeTable = formatTable(negativeChanges, '負異動');
+        
         res.json({
           status: 'success',
           channel: 'position',
-          totalSymbols: currentData.size,
-          changeCount: changes.length,
-          changes: changes.slice(0, 20), // 只返回前20個
+          totalSymbols: symbolData.size,
+          changeCount: allChanges.length,
+          tables: {
+            positive: positiveTable,
+            negative: negativeTable
+          },
+          data: {
+            positive: positiveChanges,
+            negative: negativeChanges
+          },
           lastUpdate: new Date().toISOString()
         });
       } catch (error) {
@@ -748,6 +814,14 @@ ${tableRows}
     
     const sign = changePercent >= 0 ? '+' : '';
     return `${sign}${changePercent.toFixed(2)}%`;
+  }
+
+  formatPercent(value) {
+    if (typeof value !== 'number' || isNaN(value)) {
+      return '   0.00%';
+    }
+    const sign = value >= 0 ? '+' : '';
+    return `${sign}${value.toFixed(2)}%`;
   }
 
   getRouter() {
