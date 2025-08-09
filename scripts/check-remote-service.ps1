@@ -3,7 +3,7 @@
 # ==============================================
 
 param(
-    [string]$SSHHost = "gcp_jkes6204_new"
+    [string]$SSHHost = "your_server_host"
 )
 
 Write-Host "🔍 檢查遠端服務狀態 (此專案不使用PM2)..." -ForegroundColor Cyan

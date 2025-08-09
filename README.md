@@ -1,4 +1,4 @@
-﻿# 🚀 加密貨幣交易所監控系統
+# 🚀 加密貨幣交易所監控系統
 
 一個強大的 Bitget 交易所監控系統，支援持倉量監控、資金費率監控和實時 Discord 通知。
 
@@ -68,13 +68,7 @@ LOG_LEVEL=info
 VERBOSE_LOGGING=false
 ```
 
-## � 部署
-
-### 自動部署（推薦）
-推送到 main 分支會自動部署到 GCP VM：
-```bash
-git push origin main
-```
+## 🚀 部署
 
 ### 手動部署
 1. 準備伺服器環境：

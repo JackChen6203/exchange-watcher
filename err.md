@@ -1,35 +1,57 @@
-Run echo "Checking for proper .env usage..."
-  echo "Checking for proper .env usage..."
-  
-  # 檢查是否所有敏感配置都使用 process.env
-  FILES_WITH_CONFIG=$(find src -name "*.js" -exec grep -l "apiKey\|apiSecret\|webhookUrl\|token" {} \;)
-  
-  for file in $FILES_WITH_CONFIG; do
-    echo "Checking $file..."
-    # 檢查是否有硬編碼的敏感值（排除合理的配置傳遞）
-    PROBLEMATIC_LINES=$(grep -E "(apiKey|apiSecret|webhookUrl|token).*=" "$file" | \
-      grep -v "process.env" | \
-      grep -v "config\." | \
-      grep -v "//.*=" | \
-      grep -v "/\*.*=" || true)
-    
-    if [ ! -z "$PROBLEMATIC_LINES" ]; then
-      echo "⚠️  Found potential hardcoded config in $file"
-      echo "$PROBLEMATIC_LINES"
-      exit 1
-    fi
-  done
-  
-  echo "✅ All sensitive configs use environment variables or proper config objects!"
-  shell: /usr/bin/bash -e {0}
-Checking for proper .env usage...
-Checking src/index.js...
-Checking src/config/config.js...
-Checking src/enhancedIndex.js...
-Checking src/services/enhancedDiscordService.js...
-⚠️  Found potential hardcoded config in src/services/enhancedDiscordService.js
-      const webhookUrl = this.getWebhookUrl(channel);
-      this.lastSentTime[webhookUrl] = Date.now();
-      const webhookUrl = this.getWebhookUrl(channel);
-      this.lastSentTime[webhookUrl] = Date.now();
-Error: Process completed with exit code 1.
+2025-08-10T06:52:25.614+08:00 [info] > git diff -- src/services/enhancedDiscordService.js [77ms]
+2025-08-10T06:52:25.666+08:00 [info] > git diff -- test/enhancedTest.js [51ms]
+2025-08-10T06:52:36.674+08:00 [info] > git add -A -- . [71ms]
+2025-08-10T06:52:36.863+08:00 [info] > git -c user.useConfigOnly=true commit --quiet --allow-empty-message --file - [188ms]
+2025-08-10T06:52:36.906+08:00 [info] > git config --get commit.template [41ms]
+2025-08-10T06:52:36.952+08:00 [info] > git config --get commit.template [44ms]
+2025-08-10T06:52:36.959+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [50ms]
+2025-08-10T06:52:36.962+08:00 [info] git commit changed on branch: {"type":0,"name":"main","upstream":{"name":"main","remote":"origin","commit":"a40069b75090c9da1abdab842afd7b198ecdb413"},"commit":"5e8fa5656d105f66d9722ff9902cdfd51cdd2e17","ahead":3,"behind":0} {"type":0,"name":"main","upstream":{"name":"main","remote":"origin","commit":"a40069b75090c9da1abdab842afd7b198ecdb413"},"commit":"1507531afe91e6521a06f2027cd10130ab7b39ec","ahead":4,"behind":0}
+2025-08-10T06:52:37.007+08:00 [info] > git status -z -uall [46ms]
+2025-08-10T06:52:37.007+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [45ms]
+2025-08-10T06:52:37.062+08:00 [info] > git config --get --local remote.origin.url [53ms]
+2025-08-10T06:52:37.067+08:00 [info] > git merge-base refs/heads/main refs/remotes/origin/main [56ms]
+2025-08-10T06:52:37.147+08:00 [info] > git show -s --decorate=full --shortstat --format=%H%n%aN%n%aE%n%at%n%ct%n%P%n%D%n%B -z 1507531afe91e6521a06f2027cd10130ab7b39ec -- [83ms]
+2025-08-10T06:52:37.147+08:00 [info] > git diff --name-status -z --diff-filter=ADMR a40069b75090c9da1abdab842afd7b198ecdb413...refs/remotes/origin/main [78ms]
+2025-08-10T06:52:37.194+08:00 [info] > git log --format=%H%n%aN%n%aE%n%at%n%ct%n%P%n%D%n%B -z --shortstat --diff-merges=first-parent -n50 --skip=0 --topo-order --decorate=full --stdin [164ms]
+2025-08-10T06:52:37.896+08:00 [info] > git push origin main:main [883ms]
+2025-08-10T06:52:37.896+08:00 [info] remote: Permission to Davis1233798/exchange_monitor.git denied to JackChen6203.
+fatal: unable to access 'https://github.com/Davis1233798/exchange_monitor.git/': The requested URL returned error: 403
+2025-08-10T06:52:38.078+08:00 [info] > git ls-tree -l a40069b75090c9da1abdab842afd7b198ecdb413 -- src/services/enhancedContractMonitor.js [47ms]
+2025-08-10T06:52:38.078+08:00 [info] > git ls-tree -l 9a841de40f37f107315c1ebbaa6d3ad72f2dab87 -- src/routes/monitoringRoutes.js [50ms]
+2025-08-10T06:52:38.078+08:00 [info] > git ls-tree -l a40069b75090c9da1abdab842afd7b198ecdb413 -- src/routes/monitoringRoutes.js [49ms]
+2025-08-10T06:52:38.079+08:00 [info] > git ls-tree -l 9a841de40f37f107315c1ebbaa6d3ad72f2dab87 -- src/services/enhancedContractMonitor.js [49ms]
+2025-08-10T06:52:38.133+08:00 [info] > git show --textconv 9a841de40f37f107315c1ebbaa6d3ad72f2dab87:src/routes/monitoringRoutes.js [49ms]
+2025-08-10T06:52:38.133+08:00 [info] > git show --textconv 9a841de40f37f107315c1ebbaa6d3ad72f2dab87:src/services/enhancedContractMonitor.js [47ms]
+2025-08-10T06:52:38.133+08:00 [info] > git show --textconv a40069b75090c9da1abdab842afd7b198ecdb413:src/services/enhancedContractMonitor.js [50ms]
+2025-08-10T06:52:38.133+08:00 [info] > git show --textconv a40069b75090c9da1abdab842afd7b198ecdb413:src/routes/monitoringRoutes.js [48ms]
+2025-08-10T06:52:45.887+08:00 [info] > git config --get commit.template [45ms]
+2025-08-10T06:52:45.892+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [48ms]
+2025-08-10T06:52:45.945+08:00 [info] > git status -z -uall [51ms]
+2025-08-10T06:52:45.946+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [51ms]
+2025-08-10T06:52:46.000+08:00 [info] > git config --get commit.template [43ms]
+2025-08-10T06:52:46.004+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [45ms]
+2025-08-10T06:52:46.052+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [45ms]
+2025-08-10T06:52:46.053+08:00 [info] > git status -z -uall [47ms]
+2025-08-10T06:52:47.313+08:00 [info] > git log --oneline --cherry main...main@{upstream} -- [46ms]
+2025-08-10T06:52:48.011+08:00 [info] > git pull --tags origin main [696ms]
+2025-08-10T06:52:48.011+08:00 [info] fatal: couldn't find remote ref main
+2025-08-10T06:52:48.054+08:00 [info] > git config --get commit.template [42ms]
+2025-08-10T06:52:48.059+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [46ms]
+2025-08-10T06:52:48.108+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [47ms]
+2025-08-10T06:52:48.108+08:00 [info] > git status -z -uall [48ms]
+2025-08-10T06:52:48.632+08:00 [info] > git ls-tree -l 9a841de40f37f107315c1ebbaa6d3ad72f2dab87 -- src/routes/monitoringRoutes.js [54ms]
+2025-08-10T06:52:48.633+08:00 [info] > git ls-tree -l a40069b75090c9da1abdab842afd7b198ecdb413 -- src/services/enhancedContractMonitor.js [51ms]
+2025-08-10T06:52:48.633+08:00 [info] > git ls-tree -l 9a841de40f37f107315c1ebbaa6d3ad72f2dab87 -- src/services/enhancedContractMonitor.js [52ms]
+2025-08-10T06:52:48.635+08:00 [info] > git ls-tree -l a40069b75090c9da1abdab842afd7b198ecdb413 -- src/routes/monitoringRoutes.js [56ms]
+2025-08-10T06:52:48.683+08:00 [info] > git show --textconv a40069b75090c9da1abdab842afd7b198ecdb413:src/services/enhancedContractMonitor.js [47ms]
+2025-08-10T06:52:48.683+08:00 [info] > git show --textconv a40069b75090c9da1abdab842afd7b198ecdb413:src/routes/monitoringRoutes.js [46ms]
+2025-08-10T06:52:48.684+08:00 [info] > git show --textconv 9a841de40f37f107315c1ebbaa6d3ad72f2dab87:src/routes/monitoringRoutes.js [49ms]
+2025-08-10T06:52:48.684+08:00 [info] > git show --textconv 9a841de40f37f107315c1ebbaa6d3ad72f2dab87:src/services/enhancedContractMonitor.js [47ms]
+2025-08-10T06:52:49.627+08:00 [info] > git config --get commit.template [44ms]
+2025-08-10T06:52:49.632+08:00 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [47ms]
+2025-08-10T06:52:49.680+08:00 [info] > git status -z -uall [47ms]
+2025-08-10T06:52:49.681+08:00 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [47ms]
+2025-08-10T06:53:14.016+08:00 [info] > git ls-tree -l 9a841de40f37f107315c1ebbaa6d3ad72f2dab87 -- src/services/enhancedContractMonitor.js [94ms]
+2025-08-10T06:53:14.017+08:00 [info] > git ls-tree -l a40069b75090c9da1abdab842afd7b198ecdb413 -- src/routes/monitoringRoutes.js [96ms]
+2025-08-10T06:53:14.017+08:00 [info] > git ls-tree -l a40069b75090c9da1abdab842afd7b198ecdb413 -- src/services/enhancedContractMonitor.js [94ms]
+2025-08-10T06:53:14.017+08:00 [info] > git ls-tree -l 9a841de40f37f107315c1ebbaa6d3ad72f2dab87 -- src/routes/monitoringRoutes.js [97ms]
