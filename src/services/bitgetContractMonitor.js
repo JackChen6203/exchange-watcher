@@ -456,12 +456,12 @@ class BitgetContractMonitor {
       const positiveChanges = changes
         .filter(c => c.change > 0)
         .sort((a, b) => b.changePercent - a.changePercent)
-        .slice(0, 15);
+        .slice(0, 8);
         
       const negativeChanges = changes
         .filter(c => c.change < 0)
         .sort((a, b) => a.changePercent - b.changePercent)
-        .slice(0, 15);
+        .slice(0, 8);
       
       results[period] = {
         positive: positiveChanges,
@@ -485,13 +485,13 @@ class BitgetContractMonitor {
     const positiveFunding = fundingRates
       .filter(rate => rate.fundingRate > 0)
       .sort((a, b) => b.fundingRate - a.fundingRate)
-      .slice(0, 15);
+      .slice(0, 8);
     
     // 負資金費率排行（最低15個）
     const negativeFunding = fundingRates
       .filter(rate => rate.fundingRate < 0)
       .sort((a, b) => a.fundingRate - b.fundingRate)
-      .slice(0, 15);
+      .slice(0, 8);
     
     return {
       positive: positiveFunding,
@@ -543,7 +543,7 @@ class BitgetContractMonitor {
     // 按15分鐘變化排序
     const sortedData = Array.from(combinedData.values())
       .sort((a, b) => (b.changes['15m'] || 0) - (a.changes['15m'] || 0))
-      .slice(0, 15);
+      .slice(0, 8);
 
     // 生成表格
     const tableRows = sortedData.map((item, index) => {
@@ -558,14 +558,14 @@ class BitgetContractMonitor {
     }).join('\n');
 
     const tableContent = `\`\`\`
-📈 持倉量增長排行 TOP15 (多時間週期漲幅對比)
+📈 持倉量增長排行 TOP8 (多時間週期漲幅對比)
 
 排名 | 交易對      | 當前持倉   | 15分    | 1時     | 4時     | 日線
 -----|-----------|----------|---------|---------|---------|--------
 ${tableRows}
 \`\`\``;
 
-    await this.discordService.sendMessage(tableContent);
+    await this.discordService.sendMessage(tableContent, 'position');
   }
 
   async sendCombinedNegativeChangesReport(positionChanges, periods, periodNames) {
@@ -593,7 +593,7 @@ ${tableRows}
     // 按15分鐘變化排序（負值，所以是從小到大）
     const sortedData = Array.from(combinedData.values())
       .sort((a, b) => (a.changes['15m'] || 0) - (b.changes['15m'] || 0))
-      .slice(0, 15);
+      .slice(0, 8);
 
     // 生成表格
     const tableRows = sortedData.map((item, index) => {
@@ -608,20 +608,20 @@ ${tableRows}
     }).join('\n');
 
     const tableContent = `\`\`\`
-📉 持倉量減少排行 TOP15 (多時間週期跌幅對比)
+📉 持倉量減少排行 TOP8 (多時間週期跌幅對比)
 
 排名 | 交易對      | 當前持倉   | 15分    | 1時     | 4時     | 日線
 -----|-----------|----------|---------|---------|---------|--------
 ${tableRows}
 \`\`\``;
 
-    await this.discordService.sendMessage(tableContent);
+    await this.discordService.sendMessage(tableContent, 'position');
   }
 
   async sendFundingRateReport(fundingRateRankings) {
     // 合併正負資金費率在一個表格中
-    const positiveRates = fundingRateRankings.positive.slice(0, 15);
-    const negativeRates = fundingRateRankings.negative.slice(0, 15);
+    const positiveRates = fundingRateRankings.positive.slice(0, 8);
+    const negativeRates = fundingRateRankings.negative.slice(0, 8);
     
     if (positiveRates.length === 0 && negativeRates.length === 0) return;
 
@@ -646,7 +646,7 @@ ${tableRows}
     }
 
     const tableContent = `\`\`\`
-💰💸 資金費率排行 TOP15
+💰💸 資金費率排行 TOP8
 
 正費率(多頭付費)                    || 負費率(空頭付費)
 排名| 交易對     | 費率     || 排名| 交易對     | 費率
@@ -654,7 +654,7 @@ ${tableRows}
 ${combinedRows.join('\n')}
 \`\`\``;
 
-    await this.discordService.sendMessage(tableContent);
+    await this.discordService.sendMessage(tableContent, 'funding_rate');
   }
 
   formatNumber(num) {
@@ -910,7 +910,7 @@ ${tableRows}
 \`\`\`
 [${beijingTime.includes('上午') ? '上午' : '下午'}${beijingTime.replace(/上午|下午/, '')}]`;
 
-    await this.discordService.sendMessage(tableContent);
+    await this.discordService.sendMessage(tableContent, 'position');
   }
 
   async sendPriceTable(type, data) {
@@ -943,7 +943,7 @@ ${tableRows}
 \`\`\`
 [${beijingTime.includes('上午') ? '上午' : '下午'}${beijingTime.replace(/上午|下午/, '')}]`;
 
-    await this.discordService.sendMessage(tableContent);
+    await this.discordService.sendMessage(tableContent, 'price_alert');
   }
 
   formatPercent(value) {

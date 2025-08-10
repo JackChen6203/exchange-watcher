@@ -25,6 +25,7 @@ class ContractMonitor {
     
     // 報告間隔配置
     this.reportIntervals = {
+      '5m': 5 * 60 * 1000,        // 5分鐘 - 主要報告間隔
       '15m': 15 * 60 * 1000,      // 15分鐘
       '1h': 60 * 60 * 1000,       // 1小時
       '4h': 4 * 60 * 60 * 1000,   // 4小時
@@ -283,12 +284,12 @@ class ContractMonitor {
   }
 
   startPeriodicReports() {
-    // 每15分鐘發送報告
+    // 改為每5分鐘發送報告（符合用戶要求）
     this.reportInterval = setInterval(async () => {
       await this.generateAndSendReport();
-    }, this.reportIntervals['15m']);
+    }, this.reportIntervals['5m']);
     
-    this.logger.info('🔄 啟動定期報告系統 (每15分鐘)');
+    this.logger.info('🔄 啟動定期報告系統 (每5分鐘)');
   }
 
   startFundingRateAlerts() {
@@ -352,9 +353,9 @@ class ContractMonitor {
       }
     }
     
-    // 排序並取前15名
-    rankings.positive.sort((a, b) => b.changePercent - a.changePercent).splice(15);
-    rankings.negative.sort((a, b) => a.changePercent - b.changePercent).splice(15);
+    // 排序並取前8名（符合用戶要求）
+    rankings.positive.sort((a, b) => b.changePercent - a.changePercent).splice(8);
+    rankings.negative.sort((a, b) => a.changePercent - b.changePercent).splice(8);
     
     return rankings;
   }
@@ -387,9 +388,9 @@ class ContractMonitor {
       }
     }
     
-    // 排序並取前15名
-    rankings.positive.sort((a, b) => b.fundingRate - a.fundingRate).splice(15);
-    rankings.negative.sort((a, b) => a.fundingRate - b.fundingRate).splice(15);
+    // 排序並取前8名（符合用戶要求）
+    rankings.positive.sort((a, b) => b.fundingRate - a.fundingRate).splice(8);
+    rankings.negative.sort((a, b) => a.fundingRate - b.fundingRate).splice(8);
     
     return rankings;
   }
@@ -400,17 +401,17 @@ class ContractMonitor {
     
     // 持倉量變動報告 - 發送到專用webhook
     const oiEmbed = {
-      title: '📊 持倉量變動排行榜 (15分鐘)',
+      title: '📊 持倉量變動排行榜 (5分鐘)',
       description: `統計時間: ${timeStr}`,
       color: 0x1f8b4c,
       fields: [
         {
-          name: '📈 持倉量正異動 TOP 15',
+          name: '📈 持倉量正異動 TOP 8',
           value: this.formatOpenInterestRanking(openInterestRankings.positive),
           inline: false
         },
         {
-          name: '📉 持倉量負異動 TOP 15', 
+          name: '📉 持倉量負異動 TOP 8', 
           value: this.formatOpenInterestRanking(openInterestRankings.negative),
           inline: false
         }
@@ -424,17 +425,17 @@ class ContractMonitor {
 
     // 資金費率報告 - 發送到一般頻道
     const frEmbed = {
-      title: '💰 資金費率排行榜 (15分鐘)',
+      title: '💰 資金費率排行榜 (5分鐘)',
       description: `統計時間: ${timeStr}`,
       color: 0xe74c3c,
       fields: [
         {
-          name: '🟢 正資金費率 TOP 15',
+          name: '🟢 正資金費率 TOP 8',
           value: this.formatFundingRateRanking(fundingRateRankings.positive),
           inline: false
         },
         {
-          name: '🔴 負資金費率 TOP 15',
+          name: '🔴 負資金費率 TOP 8',
           value: this.formatFundingRateRanking(fundingRateRankings.negative), 
           inline: false
         }
