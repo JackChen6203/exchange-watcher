@@ -147,7 +147,10 @@ class BitgetContractMonitor {
         }
       }
       
-      this.logger.info(`✅ 收集到 ${this.openInterests.current.size} 個開倉量數據和 ${this.fundingRates.size} 個資金費率數據`);
+      // 獲取價格數據（使用批量API）
+      await this.updatePriceData();
+      
+      this.logger.info(`✅ 收集到 ${this.openInterests.current.size} 個開倉量數據、${this.priceData.current.size} 個價格數據和 ${this.fundingRates.size} 個資金費率數據`);
       
     } catch (error) {
       this.logger.error('❌ 收集初始數據失敗:', error);
@@ -169,19 +172,24 @@ class BitgetContractMonitor {
       await this.generateAndSendPositionPriceReport();
     }, 5 * 60 * 1000); // 5分鐘
     
-    // 每小時50分、55分、59分發送資金費率報告
+    // 每小時49分、54分發送資金費率報告 (在資金費率結算前)
     this.fundingRateReportInterval = setInterval(async () => {
       const now = new Date();
       const minutes = now.getMinutes();
       
-      if (minutes === 50 || minutes === 55 || minutes === 59) {
-        await this.generateAndSendFundingRateReport();
+      // 防止重複發送 - 檢查是否在同一分鐘內已發送過
+      const currentTime = `${now.getHours()}:${minutes}`;
+      if (!this.lastFundingRateTime || this.lastFundingRateTime !== currentTime) {
+        if (minutes === 49 || minutes === 54) {
+          this.lastFundingRateTime = currentTime;
+          await this.generateAndSendFundingRateReport();
+        }
       }
     }, 60 * 1000); // 每分鐘檢查一次
     
     this.logger.info('📊 啟動定期報告:');
     this.logger.info('   - 持倉/價格異動: 每5分鐘');
-    this.logger.info('   - 資金費率: 每小時50、55、59分');
+    this.logger.info('   - 資金費率: 每小時49、54分');
   }
 
   async updateContractData() {
@@ -231,36 +239,33 @@ class BitgetContractMonitor {
 
   async updatePriceData() {
     try {
-      const symbols = Array.from(this.openInterests.current.keys());
-      const batchSize = 10; // 每批處理10個合約
+      // 使用批量API獲取所有ticker數據，更高效
+      const allTickers = await this.bitgetApi.getAllTickers('umcbl');
+      const activeSymbols = new Set(this.openInterests.current.keys());
       
-      for (let i = 0; i < Math.min(symbols.length, 50); i += batchSize) { // 只處理前50個活躍合約
-        const batch = symbols.slice(i, i + batchSize);
+      // 批量API返回的符號格式為 BTCUSDT_UMCBL，需要移除後綴匹配持倉量數據
+      allTickers.forEach(ticker => {
+        // 移除 _UMCBL 後綴獲得清潔符號
+        const cleanSymbol = ticker.symbol.replace('_UMCBL', '');
         
-        const pricePromises = batch.map(async (symbol) => {
-          try {
-            const ticker = await this.bitgetApi.getSymbolTicker(symbol);
-            this.priceData.current.set(symbol, {
-              symbol: ticker.symbol,
-              lastPrice: ticker.lastPrice,
-              change24h: ticker.change24h,
-              changePercent24h: ticker.changePercent24h,
-              timestamp: ticker.timestamp
-            });
-          } catch (error) {
-            this.logger.debug(`⚠️ 無法獲取${symbol}價格:`, error.message);
-          }
-        });
-        
-        await Promise.all(pricePromises);
-        // 避免API限制，每批之間暫停
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
+        if (activeSymbols.has(cleanSymbol)) {
+          this.priceData.current.set(cleanSymbol, {
+            symbol: cleanSymbol,
+            lastPrice: ticker.lastPrice,
+            change24h: ticker.change24h,
+            changePercent24h: ticker.changePercent24h,
+            timestamp: ticker.timestamp
+          });
+        }
+      });
       
       this.logger.debug(`💰 更新價格數據完成: ${this.priceData.current.size}個合約`);
       
     } catch (error) {
       this.logger.error('❌ 更新價格數據失敗:', error);
+      
+      // 如果批量失敗，不使用回退方案，因為单個ticker API也有同樣的符號格式問題
+      this.logger.warn('⚠️ 無法獲取價格數據，將在下次更新時重試');
     }
   }
 
@@ -307,7 +312,15 @@ class BitgetContractMonitor {
     }
     
     const lastBackup = this.lastBackupTime[period] || 0;
-    if (now - lastBackup >= intervals[period]) {
+    
+    // 如果是第一次備份或者時間間隔已到，就備份
+    // 特別處理：系統剛啟動時先建立基線數據
+    if (lastBackup === 0) {
+      // 第一次備份，建立基線
+      this.lastBackupTime[period] = now;
+      return true;
+    } else if (now - lastBackup >= intervals[period]) {
+      // 達到時間間隔，更新數據
       this.lastBackupTime[period] = now;
       return true;
     }
@@ -412,6 +425,19 @@ class BitgetContractMonitor {
             absolute: priceChange,
             percent: priceChangePercent
           };
+          
+          // 調試信息：鄉個符號的價格變化
+          if (Math.abs(priceChangePercent) > 0.1) { // 只記錄有意義的變化
+            this.logger.debug(`💰 ${symbol} ${period} 價格變化: ${historicalPrice.lastPrice} -> ${currentPrice.lastPrice} (${priceChangePercent.toFixed(2)}%)`);
+          }
+        } else {
+          // 調試信息：缺少歷史數據
+          if (!historicalPrice) {
+            this.logger.debug(`⚠️ ${symbol} 缺少 ${period} 歷史價格數據`);
+          }
+          if (!currentPrice) {
+            this.logger.debug(`⚠️ ${symbol} 缺少當前價格數據`);
+          }
         }
       });
       
@@ -625,32 +651,38 @@ ${tableRows}
     
     if (positiveRates.length === 0 && negativeRates.length === 0) return;
 
-    // 生成正資金費率部分
-    const positiveRows = positiveRates.map((item, index) => 
-      `${(index + 1).toString().padStart(2)} | ${item.symbol.padEnd(10)} | ${item.fundingRatePercent.toFixed(4).padStart(7)}%`
-    );
+    // 生成正資金費率部分 (固定寬度对齊)
+    const positiveRows = positiveRates.map((item, index) => {
+      const rank = (index + 1).toString().padStart(2, ' ');
+      const symbol = item.symbol.padEnd(11, ' ');
+      const rate = item.fundingRatePercent.toFixed(4).padStart(8, ' ');
+      return `${rank} | ${symbol} | ${rate}%`;
+    });
 
-    // 生成負資金費率部分
-    const negativeRows = negativeRates.map((item, index) => 
-      `${(index + 1).toString().padStart(2)} | ${item.symbol.padEnd(10)} | ${item.fundingRatePercent.toFixed(4).padStart(7)}%`
-    );
+    // 生成負資金費率部分 (固定寬度对齊)
+    const negativeRows = negativeRates.map((item, index) => {
+      const rank = (index + 1).toString().padStart(2, ' ');
+      const symbol = item.symbol.padEnd(11, ' ');
+      const rate = item.fundingRatePercent.toFixed(4).padStart(8, ' ');
+      return `${rank} | ${symbol} | ${rate}%`;
+    });
 
     // 創建並列表格 - 分別顯示正負費率
     const maxRows = Math.max(positiveRows.length, negativeRows.length);
     const combinedRows = [];
     
     for (let i = 0; i < maxRows; i++) {
-      const positiveRow = positiveRows[i] || '   |            |        ';
-      const negativeRow = negativeRows[i] || '   |            |        ';
+      const positiveRow = positiveRows[i] || '   |             |         ';
+      const negativeRow = negativeRows[i] || '   |             |         ';
       combinedRows.push(`${positiveRow} || ${negativeRow}`);
     }
 
     const tableContent = `\`\`\`
 💰💸 資金費率排行 TOP8
 
-正費率(多頭付費)                    || 負費率(空頭付費)
-排名| 交易對     | 費率     || 排名| 交易對     | 費率
-----|-----------|----------||-----|-----------|----------
+正費率(多頭付費)                       || 負費率(空頭付費)
+排名 | 交易對        | 費率     || 排名 | 交易對        | 費率
+-----|-------------|----------||----|-------------|----------
 ${combinedRows.join('\n')}
 \`\`\``;
 
@@ -803,9 +835,13 @@ ${combinedRows.join('\n')}
       
       analysisData.forEach((data, symbol) => {
         if (data.positionChanges['15m']) {
+          // 計算真實市值 = 當前價格 * 持倉量(美元)
+          const marketCap = data.currentPrice && data.currentPosition ? 
+            data.currentPrice * data.currentPosition : data.currentPosition || 1000000;
+          
           combinedData.push({
             symbol: symbol,
-            marketCap: data.currentPosition || 100000, // 使用持倉量作為市值指標
+            marketCap: marketCap,
             position15m: data.positionChanges['15m'].percent,
             price15m: data.priceChanges['15m']?.percent || 0,
             position1h: data.positionChanges['1h']?.percent || 0,
@@ -902,9 +938,13 @@ ${tableRows}
       
       analysisData.forEach((data, symbol) => {
         if (data.priceChanges['15m']) {
+          // 計算真實市值 = 當前價格 * 持倉量(美元)
+          const marketCap = data.currentPrice && data.currentPosition ? 
+            data.currentPrice * data.currentPosition : data.currentPosition || 1000000;
+          
           combinedData.push({
             symbol: symbol,
-            marketCap: data.currentPrice * (data.currentPosition || 100000), // 計算市值
+            marketCap: marketCap,
             price15m: data.priceChanges['15m'].percent,
             price1h: data.priceChanges['1h']?.percent || 0,
             price4h: data.priceChanges['4h']?.percent || 0

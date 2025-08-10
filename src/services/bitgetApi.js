@@ -450,10 +450,13 @@ class BitgetApi {
       const contracts = await this.getSymbolsByProductType(productType);
       const openInterestData = [];
       
-      // 分批處理，每批5個合約以避免頻率限制
-      const batchSize = 5;
-      for (let i = 0; i < contracts.length; i += batchSize) {
-        const batch = contracts.slice(i, i + batchSize);
+      // 分批處理，每批10個合約以避免頻率限制，減少延遲提高效率
+      const batchSize = 10;
+      // 限制處理前150個活躍合約以加快初始報告生成
+      const limitedContracts = contracts.slice(0, 150);
+      
+      for (let i = 0; i < limitedContracts.length; i += batchSize) {
+        const batch = limitedContracts.slice(i, i + batchSize);
         
         const batchPromises = batch.map(async (contract) => {
           try {
@@ -468,9 +471,9 @@ class BitgetApi {
         const batchResults = await Promise.all(batchPromises);
         openInterestData.push(...batchResults.filter(result => result !== null));
         
-        // 批次間延遲，避免API限制
-        if (i + batchSize < contracts.length) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
+        // 減少批次間延遲，從1500ms減少到500ms
+        if (i + batchSize < limitedContracts.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
         
         console.log(`📊 已獲取 ${openInterestData.length} 個開倉量數據...`);
