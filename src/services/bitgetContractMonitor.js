@@ -798,152 +798,202 @@ ${combinedRows.join('\n')}
 
   async sendPositionChangeTable(analysisData) {
     try {
-      // 準備時間周期數據
-      const periods = ['15m', '1h', '4h'];
-      const changes = {};
+      // 準備綜合數據用於持倉異動表格
+      const combinedData = [];
       
-      periods.forEach(period => {
-        changes[period] = {
-          positive: [],
-          negative: []
-        };
-        
-        analysisData.forEach((data, symbol) => {
-          if (data.positionChanges[period]) {
-            const changeData = {
-              symbol: symbol,
-              changePercent: data.positionChanges[period].percent,
-              priceChange: data.priceChanges[period]?.percent || 0,
-              marketCap: data.currentPosition || 100000 // 使用持倉量作為市值指標
-            };
-            
-            if (changeData.changePercent > 0) {
-              changes[period].positive.push(changeData);
-            } else if (changeData.changePercent < 0) {
-              changes[period].negative.push(changeData);
-            }
-          }
-        });
-        
-        // 排序
-        changes[period].positive.sort((a, b) => b.changePercent - a.changePercent);
-        changes[period].negative.sort((a, b) => a.changePercent - b.changePercent);
+      analysisData.forEach((data, symbol) => {
+        if (data.positionChanges['15m']) {
+          combinedData.push({
+            symbol: symbol,
+            marketCap: data.currentPosition || 100000, // 使用持倉量作為市值指標
+            position15m: data.positionChanges['15m'].percent,
+            price15m: data.priceChanges['15m']?.percent || 0,
+            position1h: data.positionChanges['1h']?.percent || 0,
+            price1h: data.priceChanges['1h']?.percent || 0,
+            position4h: data.positionChanges['4h']?.percent || 0,
+            price4h: data.priceChanges['4h']?.percent || 0
+          });
+        }
       });
       
-      // 使用新的格式發送
-      await this.discordService.sendPositionChangeReport(changes, 'position');
+      // 分離正異動和負異動
+      const positiveChanges = combinedData.filter(item => item.position15m > 0)
+        .sort((a, b) => b.position15m - a.position15m)
+        .slice(0, 8);
+        
+      const negativeChanges = combinedData.filter(item => item.position15m < 0)
+        .sort((a, b) => a.position15m - b.position15m)
+        .slice(0, 8);
+      
+      // 發送正異動表格
+      if (positiveChanges.length > 0) {
+        await this.sendPositionPositiveTable(positiveChanges);
+      }
+      
+      // 等待避免頻率限制
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // 發送負異動表格
+      if (negativeChanges.length > 0) {
+        await this.sendPositionNegativeTable(negativeChanges);
+      }
       
     } catch (error) {
       this.logger.error('❌ 發送持倉異動表格失敗:', error);
     }
   }
 
+  async sendPositionPositiveTable(positiveChanges) {
+    const tableRows = positiveChanges.map((item, index) => {
+      const rank = (index + 1).toString().padStart(1);
+      const symbol = item.symbol.padEnd(12);
+      const marketCap = this.formatMarketCap(item.marketCap).padStart(10);
+      const pos15m = this.formatPercent(item.position15m).padStart(8);
+      const price15m = this.formatPercent(item.price15m).padStart(8);
+      const pos1h = this.formatPercent(item.position1h).padStart(7);
+      const price1h = this.formatPercent(item.price1h).padStart(8);
+      const pos4h = this.formatPercent(item.position4h).padStart(6);
+      const price4h = this.formatPercent(item.price4h).padStart(8);
+      
+      return `${rank} | ${symbol} | ${marketCap} | ${pos15m} | ${price15m} | ${pos1h} | ${price1h} | ${pos4h} | ${price4h}`;
+    }).join('\n');
+
+    const tableContent = `\`\`\`
+📊 持倉異動排行 正異動 TOP8 (各時間周期對比)
+
+排名 | 幣種          | 總市值  | 15分持倉 | 15分價格異動 | 1h持倉  |1h價格異動 | 4h持倉 | 4h價格異動
+-----|-------------|----------|----------|----------|----------|----------|----------|----------
+${tableRows}
+\`\`\``;
+
+    await this.discordService.sendMessage(tableContent, 'position');
+  }
+
+  async sendPositionNegativeTable(negativeChanges) {
+    const tableRows = negativeChanges.map((item, index) => {
+      const rank = (index + 1).toString().padStart(1);
+      const symbol = item.symbol.padEnd(12);
+      const marketCap = this.formatMarketCap(item.marketCap).padStart(10);
+      const pos15m = this.formatPercent(item.position15m).padStart(8);
+      const price15m = this.formatPercent(item.price15m).padStart(8);
+      const pos1h = this.formatPercent(item.position1h).padStart(7);
+      const price1h = this.formatPercent(item.price1h).padStart(8);
+      const pos4h = this.formatPercent(item.position4h).padStart(6);
+      const price4h = this.formatPercent(item.price4h).padStart(8);
+      
+      return `${rank} | ${symbol} | ${marketCap} | ${pos15m} | ${price15m} | ${pos1h} | ${price1h} | ${pos4h} | ${price4h}`;
+    }).join('\n');
+
+    const tableContent = `\`\`\`
+📊 持倉異動排行 負異動 TOP8 (各時間周期對比)
+
+排名 | 幣種          | 總市值  | 15分持倉 | 15分價格異動 | 1h持倉  |1h價格異動 | 4h持倉 | 4h價格異動
+-----|-------------|----------|----------|----------|----------|----------|----------|----------
+${tableRows}
+\`\`\``;
+
+    await this.discordService.sendMessage(tableContent, 'position');
+  }
+
   async sendPriceChangeTable(analysisData) {
     try {
-      // 準備時間周期數據
-      const periods = ['15m', '1h', '4h'];
-      const priceChanges = {};
+      // 準備價格異動數據
+      const combinedData = [];
       
-      periods.forEach(period => {
-        priceChanges[period] = {
-          positive: [],
-          negative: []
-        };
-        
-        analysisData.forEach((data, symbol) => {
-          if (data.priceChanges[period]) {
-            const priceData = {
-              symbol: symbol,
-              changePercent: data.priceChanges[period].percent,
-              currentPrice: data.currentPrice,
-              marketCap: data.currentPosition || 100000
-            };
-            
-            if (priceData.changePercent > 0) {
-              priceChanges[period].positive.push(priceData);
-            } else if (priceData.changePercent < 0) {
-              priceChanges[period].negative.push(priceData);
-            }
-          }
-        });
-        
-        // 排序
-        priceChanges[period].positive.sort((a, b) => b.changePercent - a.changePercent);
-        priceChanges[period].negative.sort((a, b) => a.changePercent - b.changePercent);
+      analysisData.forEach((data, symbol) => {
+        if (data.priceChanges['15m']) {
+          combinedData.push({
+            symbol: symbol,
+            marketCap: data.currentPrice * (data.currentPosition || 100000), // 計算市值
+            price15m: data.priceChanges['15m'].percent,
+            price1h: data.priceChanges['1h']?.percent || 0,
+            price4h: data.priceChanges['4h']?.percent || 0
+          });
+        }
       });
       
-      // 使用新的格式發送
-      await this.discordService.sendPriceChangeReport(priceChanges);
+      // 分離正異動和負異動
+      const positiveChanges = combinedData.filter(item => item.price15m > 0)
+        .sort((a, b) => b.price15m - a.price15m)
+        .slice(0, 8);
+        
+      const negativeChanges = combinedData.filter(item => item.price15m < 0)
+        .sort((a, b) => a.price15m - b.price15m)
+        .slice(0, 8);
+      
+      // 發送正異動表格
+      if (positiveChanges.length > 0) {
+        await this.sendPricePositiveTable(positiveChanges);
+      }
+      
+      // 等待避免頻率限制
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // 發送負異動表格
+      if (negativeChanges.length > 0) {
+        await this.sendPriceNegativeTable(negativeChanges);
+      }
       
     } catch (error) {
       this.logger.error('❌ 發送價格異動表格失敗:', error);
     }
   }
 
-  async sendPositionTable(type, data) {
-    // 持倉異動表格標頭：幣種 | 價格異動 | 總市值 | 15分持倉 | 1h持倉 | 4h持倉
-    const tableRows = data.map((item, index) => {
+  async sendPricePositiveTable(positiveChanges) {
+    const tableRows = positiveChanges.map((item, index) => {
+      const rank = (index + 1).toString().padStart(1);
       const symbol = item.symbol.padEnd(12);
-      const priceChange = this.formatPercent(item.priceChanges['15m']?.percent || 0).padStart(8);
-      const marketCap = '   0.00%'.padStart(8); // 總市值暫時顯示為0.00%
-      const pos15m = this.formatPercent(item.positionChanges['15m']?.percent || 0).padStart(9);
-      const pos1h = this.formatPercent(item.positionChanges['1h']?.percent || 0).padStart(9);
-      const pos4h = this.formatPercent(item.positionChanges['4h']?.percent || 0).padStart(9);
+      const marketCap = this.formatMarketCap(item.marketCap).padStart(10);
+      const price15m = this.formatPercent(item.price15m).padStart(10);
+      const price1h = this.formatPercent(item.price1h).padStart(10);
+      const price4h = this.formatPercent(item.price4h).padStart(10);
       
-      return `  ${(index + 1).toString().padStart(1)} | ${symbol} | ${priceChange} | ${marketCap} | ${pos15m} | ${pos1h} | ${pos4h}`;
+      return `${rank} | ${symbol} | ${marketCap} | ${price15m} | ${price1h} | ${price4h}`;
     }).join('\n');
 
-    // 獲取北京時間
-    const beijingTime = new Date().toLocaleString('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-
     const tableContent = `\`\`\`
-📊 持倉異動排行 ${type} TOP8 (各時間周期對比)
+📊 價格異動排行 正異動 TOP8 (各時間周期對比)
 
-排名 | 幣種          | 價格異動  | 總市值  | 15分持倉 | 1h持倉   | 4h持倉
------|-------------|----------|----------|----------|----------|----------
+排名 | 幣種          |  總市值  | 15分價格異動 | 1h價格異動   | 4h價格異動
+-----|-------------|----------|----------|----------|----------
 ${tableRows}
-\`\`\`
-[${beijingTime.includes('上午') ? '上午' : '下午'}${beijingTime.replace(/上午|下午/, '')}]`;
-
-    await this.discordService.sendMessage(tableContent, 'position');
-  }
-
-  async sendPriceTable(type, data) {
-    // 價格異動表格標頭：幣種 | 持倉異動 | 總市值 | 15分價格 | 1h價格 | 4h價格
-    const tableRows = data.map((item, index) => {
-      const symbol = item.symbol.padEnd(12);
-      const posChange = this.formatPercent(item.positionChanges['15m']?.percent || 0).padStart(8);
-      const marketCap = '   0.00%'.padStart(8); // 總市值暫時顯示為0.00%
-      const price15m = this.formatPercent(item.priceChanges['15m']?.percent || 0).padStart(9);
-      const price1h = this.formatPercent(item.priceChanges['1h']?.percent || 0).padStart(9);
-      const price4h = this.formatPercent(item.priceChanges['4h']?.percent || 0).padStart(9);
-      
-      return `  ${(index + 1).toString().padStart(1)} | ${symbol} | ${posChange} | ${marketCap} | ${price15m} | ${price1h} | ${price4h}`;
-    }).join('\n');
-
-    // 獲取北京時間
-    const beijingTime = new Date().toLocaleString('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-
-    const tableContent = `\`\`\`
-💰 價格異動排行 ${type} TOP8 (各時間周期對比)
-
-排名 | 幣種          | 持倉異動  | 總市值  | 15分價格 | 1h價格   | 4h價格
------|-------------|----------|----------|----------|----------|----------
-${tableRows}
-\`\`\`
-[${beijingTime.includes('上午') ? '上午' : '下午'}${beijingTime.replace(/上午|下午/, '')}]`;
+\`\`\``;
 
     await this.discordService.sendMessage(tableContent, 'price_alert');
+  }
+
+  async sendPriceNegativeTable(negativeChanges) {
+    const tableRows = negativeChanges.map((item, index) => {
+      const rank = (index + 1).toString().padStart(1);
+      const symbol = item.symbol.padEnd(12);
+      const marketCap = this.formatMarketCap(item.marketCap).padStart(10);
+      const price15m = this.formatPercent(item.price15m).padStart(10);
+      const price1h = this.formatPercent(item.price1h).padStart(10);
+      const price4h = this.formatPercent(item.price4h).padStart(10);
+      
+      return `${rank} | ${symbol} | ${marketCap} | ${price15m} | ${price1h} | ${price4h}`;
+    }).join('\n');
+
+    const tableContent = `\`\`\`
+📊 價格異動排行 負異動 TOP8 (各時間周期對比)
+
+排名 | 幣種          | 總市值  | 15分價格異動 | 1h價格異動   | 4h價格異動
+-----|-------------|----------|----------|----------|----------
+${tableRows}
+\`\`\``;
+
+    await this.discordService.sendMessage(tableContent, 'price_alert');
+  }
+
+  formatMarketCap(value) {
+    if (value >= 1e9) {
+      return (value / 1e9).toFixed(1) + 'B';
+    } else if (value >= 1e6) {
+      return (value / 1e6).toFixed(1) + 'M';
+    } else if (value >= 1e3) {
+      return (value / 1e3).toFixed(1) + 'K';
+    }
+    return Math.round(value).toString();
   }
 
   formatPercent(value) {
