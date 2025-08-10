@@ -190,9 +190,15 @@ class CryptoExchangeMonitor {
       console.log('📧 執行系統測試...');
       console.log('🔍 正在測試實際的價格異動和持倉異動表格功能...');
       
-      // 檢查必要的環境變數
-      if (!process.env.DISCORD_WEBHOOK_URL) {
-        console.log('⚠️ DISCORD_WEBHOOK_URL 未設置，將只測試功能，不發送 Discord 消息');
+      // 檢查Discord Webhook配置
+      const hasWebhooks = this.config.discord.fundingRateWebhookUrl || 
+                         this.config.discord.positionWebhookUrl ||
+                         this.config.discord.priceAlertWebhookUrl ||
+                         this.config.discord.swingStrategyWebhookUrl;
+      if (!hasWebhooks) {
+        console.log('⚠️ 未設置任何Discord Webhook，將只測試功能，不發送 Discord 消息');
+      } else {
+        console.log('✅ Discord Webhook已配置，測試將發送到對應頻道');
       }
       
       // 初始化合約監控器用於測試

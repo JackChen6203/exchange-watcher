@@ -3,17 +3,23 @@ const axios = require('axios');
 class DiscordService {
   constructor(config) {
     this.config = config;
-    // 直接從環境變數獲取 webhook URL，避免安全檢查誤報
-    this.webhookUrl = process.env.DISCORD_WEBHOOK_URL || config.discord.webhookUrl;
-    this.rateLimitDelay = 1000; // 1秒間隔避免頻率限制
+    // 使用專門的webhook URLs
+    this.fundingRateWebhookUrl = config.discord.fundingRateWebhookUrl;
+    this.positionWebhookUrl = config.discord.positionWebhookUrl;
+    this.priceAlertWebhookUrl = config.discord.priceAlertWebhookUrl;
+    this.swingStrategyWebhookUrl = config.discord.swingStrategyWebhookUrl;
+    this.rateLimitDelay = 2000; // 增加到2秒間隔避免頻率限制
     this.lastSentTime = 0;
+    this.messageCache = new Map(); // 新增消息緩存避免重複發送
   }
 
-  async sendMessage(content) {
+  async sendMessage(content, webhookType = 'funding_rate') {
     try {
+      const webhookUrl = this.getWebhookUrl(webhookType);
+      
       // 如果沒有配置webhook URL，直接返回
-      if (!this.webhookUrl) {
-        console.log('⚠️ Discord webhook未配置，跳過消息發送');
+      if (!webhookUrl) {
+        console.log(`⚠️ ${webhookType} Discord webhook未配置，跳過消息發送`);
         return;
       }
 
@@ -25,26 +31,28 @@ class DiscordService {
         avatar_url: this.config.discord.icons.chart
       };
 
-      const response = await axios.post(this.webhookUrl, payload, {
+      const response = await axios.post(webhookUrl, payload, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
 
       this.lastSentTime = Date.now();
-      console.log('Discord消息發送成功');
+      console.log(`Discord消息發送成功到 ${webhookType} 頻道`);
       return response.data;
     } catch (error) {
-      console.error('Discord消息發送失敗:', error.response?.data || error.message);
+      console.error(`Discord消息發送失敗到 ${webhookType} 頻道:`, error.response?.data || error.message);
       throw error;
     }
   }
 
-  async sendEmbed(embed) {
+  async sendEmbed(embed, webhookType = 'funding_rate') {
     try {
+      const webhookUrl = this.getWebhookUrl(webhookType);
+      
       // 如果沒有配置webhook URL，直接返回
-      if (!this.webhookUrl) {
-        console.log('⚠️ Discord webhook未配置，跳過嵌入消息發送');
+      if (!webhookUrl) {
+        console.log(`⚠️ ${webhookType} Discord webhook未配置，跳過嵌入消息發送`);
         return;
       }
 
@@ -56,39 +64,43 @@ class DiscordService {
         avatar_url: this.config.discord.icons.chart
       };
 
-      const response = await axios.post(this.webhookUrl, payload, {
+      const response = await axios.post(webhookUrl, payload, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
 
       this.lastSentTime = Date.now();
-      console.log('Discord嵌入消息發送成功');
+      console.log(`Discord嵌入消息發送成功到 ${webhookType} 頻道`);
       return response.data;
     } catch (error) {
-      console.error('Discord嵌入消息發送失敗:', error.response?.data || error.message);
+      console.error(`Discord嵌入消息發送失敗到 ${webhookType} 頻道:`, error.response?.data || error.message);
       throw error;
     }
   }
 
   async sendAlert(type, data) {
     let embed;
+    let webhookType;
     
     switch (type) {
       case 'price_alert':
         embed = this.createPriceAlertEmbed(data);
+        webhookType = 'price_alert';
         break;
       case 'position_alert':
         embed = this.createPositionAlertEmbed(data);
+        webhookType = 'position';
         break;
       case 'system_alert':
         embed = this.createSystemAlertEmbed(data);
+        webhookType = 'funding_rate'; // 系統警報發送到資金費率頻道
         break;
       default:
         throw new Error('未知的警報類型');
     }
 
-    return await this.sendEmbed(embed);
+    return await this.sendEmbed(embed, webhookType);
   }
 
   createPriceAlertEmbed(data) {
@@ -243,6 +255,44 @@ class DiscordService {
     return num.toFixed(2);
   }
 
+  getWebhookUrl(type) {
+    switch (type) {
+      case 'funding_rate':
+        return this.fundingRateWebhookUrl;
+      case 'position':
+        return this.positionWebhookUrl;
+      case 'price_alert':
+        return this.priceAlertWebhookUrl;
+      case 'swing_strategy':
+        return this.swingStrategyWebhookUrl;
+      default:
+        return this.fundingRateWebhookUrl; // 預設使用資金費率頻道
+    }
+  }
+
+  async sendToSpecificWebhook(embed, webhookUrl, channelName) {
+    try {
+      if (!webhookUrl) {
+        console.log(`⚠️ ${channelName} webhook URL 未設定，跳過發送`);
+        return;
+      }
+      
+      await this.checkRateLimit();
+      
+      const response = await axios.post(webhookUrl, {
+        embeds: [embed],
+        username: '交易所監控機器人',
+        avatar_url: this.config.discord.icons.chart
+      });
+      
+      this.lastSentTime = Date.now();
+      console.log(`📤 消息已發送到${channelName}`);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ 發送到${channelName}失敗:`, error.message);
+    }
+  }
+
   async sendStartupMessage() {
     const embed = {
       title: '🚀 監控系統啟動',
@@ -263,7 +313,8 @@ class DiscordService {
       timestamp: new Date().toISOString()
     };
 
-    return await this.sendEmbed(embed);
+    // 發送到資金費率頻道作為系統消息
+    return await this.sendEmbed(embed, 'funding_rate');
   }
 }
 

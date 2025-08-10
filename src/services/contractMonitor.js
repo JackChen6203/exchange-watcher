@@ -21,8 +21,7 @@ class ContractMonitor {
     this.dataUpdateInterval = null;    // 數據更新定時器
     this.fundingRateAlertInterval = null; // 資金費率提醒定時器
     
-    // Discord Webhooks - 從配置檔案讀取
-    this.positionWebhook = config.discord.positionWebhookUrl;
+    // Discord Webhooks 現在由 DiscordService 統一處理
     
     // 報告間隔配置
     this.reportIntervals = {
@@ -447,10 +446,10 @@ class ContractMonitor {
       }
     };
 
-    // 發送持倉量報告到專用webhook
-    await this.sendToPositionWebhook(oiEmbed);
-    // 發送資金費率報告到一般Discord
-    await this.discordService.sendEmbed(frEmbed);
+    // 發送持倉量報告到持倉專用頻道
+    await this.discordService.sendEmbed(oiEmbed, 'position');
+    // 發送資金費率報告到資金費率專用頻道
+    await this.discordService.sendEmbed(frEmbed, 'funding_rate');
     
     // 保存排行榜快照到数据库
     try {
@@ -504,23 +503,7 @@ class ContractMonitor {
     return num.toFixed(2);
   }
 
-  async sendToPositionWebhook(embed) {
-    try {
-      // 檢查 webhook URL 是否設定
-      if (!this.positionWebhook) {
-        this.logger.warn('⚠️ 持倉專用 webhook URL 未設定，跳過發送');
-        return;
-      }
-      
-      const axios = require('axios');
-      await axios.post(this.positionWebhook, {
-        embeds: [embed]
-      });
-      this.logger.info('📤 持倉報告已發送到專用webhook');
-    } catch (error) {
-      this.logger.error('❌ 發送持倉報告到webhook失敗:', error.message);
-    }
-  }
+  // 移除舊的sendToPositionWebhook方法，現在使用DiscordService的統一方法
 
   async sendFundingRateAlert() {
     try {
@@ -558,8 +541,8 @@ class ContractMonitor {
         }
       };
 
-      // 發送提醒到一般Discord頻道
-      await this.discordService.sendEmbed(alertEmbed);
+      // 發送資金費率提醒到資金費率專用頻道
+      await this.discordService.sendEmbed(alertEmbed, 'funding_rate');
       
       this.logger.info(`⏰ 資金費率提醒已發送 (${minute}分)`);
       

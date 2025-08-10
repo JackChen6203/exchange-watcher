@@ -230,7 +230,7 @@ class ExchangeMonitor {
       timestamp: new Date().toISOString()
     };
 
-    await this.discordService.sendEmbed(embed);
+    await this.discordService.sendEmbed(embed, 'position');
   }
 
   async notifyPriceChange(current, previous) {
@@ -260,7 +260,7 @@ class ExchangeMonitor {
       timestamp: new Date().toISOString()
     };
 
-    await this.discordService.sendEmbed(embed);
+    await this.discordService.sendEmbed(embed, 'position');
   }
 
   reconnect() {
