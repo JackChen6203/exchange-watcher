@@ -1,4 +1,4 @@
-name: Deploy to Digital Ocean
+name: Test and Deploy
 
 on:
   push:
@@ -33,27 +33,7 @@ jobs:
       run: npm run test:all
       env:
         NODE_ENV: test
-  
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Deploy to Digital Ocean
-      uses: appleboy/ssh-action@v0.1.5
-      with:
-        host: ${{ secrets.DO_HOST }}
-        username: ${{ secrets.DO_USERNAME }}
-        key: ${{ secrets.DO_SSH_KEY }}
-        port: ${{ secrets.DO_PORT }}
-        script: |
-          cd /opt/exchange-watcher
-          git pull origin main
-          npm install --production
-          npm run test
-          sudo systemctl restart crypto-monitor
-          sleep 5
-          sudo systemctl status crypto-monitor
+    - name: Test completed
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      run: echo "✅ 所有測試通過，Digital Ocean App Platform 將自動處理部署"
