@@ -13,7 +13,8 @@
     "test:e2e": "node test/e2eTest.js",
     "test:contract": "node test/contractMonitorTest.js", 
     "test:comprehensive": "node test/comprehensive.test.js",
-    "test:all": "npm run test && npm run test:enhanced && npm run test:e2e && npm run test:contract && npm run test:comprehensive",
+    "test:swing": "node test/swingStrategy.test.js",
+    "test:all": "npm run test && npm run test:enhanced && npm run test:e2e && npm run test:contract && npm run test:comprehensive && npm run test:swing",
     "test-discord": "node src/index.js --test",
     "test-enhanced": "node src/enhancedIndex.js --test",
     "test:realdata": "node test_realdata.js",
@@ -45,7 +46,10 @@
     "websocket",
     "bitget",
     "position-tracking",
-    "funding-rate"
+    "funding-rate",
+    "swing-strategy",
+    "ema",
+    "technical-analysis"
   ],
   "author": "Davis1233798",
   "license": "MIT",

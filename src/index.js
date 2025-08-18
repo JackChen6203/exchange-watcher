@@ -2,6 +2,7 @@ const config = require('./config/config');
 const DiscordService = require('./services/discordService');
 const BitgetMonitor = require('./services/bitgetMonitor');
 const BitgetContractMonitor = require('./services/bitgetContractMonitor');
+const SwingStrategyService = require('./services/swingStrategyService');
 const HealthServer = require('./server');
 const Logger = require('./utils/logger');
 
@@ -12,6 +13,7 @@ class CryptoExchangeMonitor {
     this.discordService = new DiscordService(config);
     this.bitgetMonitor = new BitgetMonitor(config, this.discordService);
     this.contractMonitor = new BitgetContractMonitor(config, this.discordService);
+    this.swingStrategyService = new SwingStrategyService(config, this.discordService);
     this.healthServer = new HealthServer(config, this);
     this.isRunning = false;
     this.startTime = new Date().toISOString();
@@ -35,6 +37,10 @@ class CryptoExchangeMonitor {
       
       // 初始化合約監控（持倉量和資金費率）
       await this.contractMonitor.initialize();
+      
+      // 初始化波段策略服務
+      this.logger.console('📈 啟動波段策略監控...');
+      await this.swingStrategyService.start();
       
       // 發送啟動消息到Discord
       await this.discordService.sendStartupMessage();
@@ -136,6 +142,11 @@ class CryptoExchangeMonitor {
           this.contractMonitor.stop();
         }
         
+        // 停止波段策略服務
+        if (this.swingStrategyService) {
+          this.swingStrategyService.stop();
+        }
+        
         // 停止健康檢查伺服器
         if (this.healthServer) {
           this.healthServer.stop();
@@ -174,11 +185,14 @@ class CryptoExchangeMonitor {
       const contractStatus = this.contractMonitor.getStatus();
       
       // 記錄詳細狀態到日志
+      const swingStatus = this.swingStrategyService.getStatus();
       this.logger.info('📊 監控狀態:', {
         '合約監控': '✅ 運行中',
         '監控合約數': contractStatus.contractSymbols,
         '持倉量數據': contractStatus.openInterestData,
         '資金費率數據': contractStatus.fundingRateData,
+        '波段策略': swingStatus.isRunning ? '✅ 運行中' : '❌ 已停止',
+        '監控幣種數': swingStatus.monitoredSymbols,
         '運行狀態': contractStatus.isRunning
       });
       

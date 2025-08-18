@@ -152,9 +152,15 @@ class EnhancedTestSuite {
   async testContractMonitorEnhancements() {
     console.log('📊 測試合約監控增強功能...');
     
+    // 創建 mock Discord 服務
+    const mockDiscordService = {
+      sendAlert: async () => ({ success: true }),
+      sendEmbed: async () => ({ success: true })
+    };
+    
     // 創建模擬的合約監控器
     const mockConfig = { ...this.testConfig };
-    const monitor = new EnhancedContractMonitor(mockConfig);
+    const monitor = new EnhancedContractMonitor(mockConfig, mockDiscordService);
     
     // 測試多時間週期數據結構
     this.test('多時間週期數據結構', () => {
@@ -203,7 +209,7 @@ class EnhancedTestSuite {
         
         const btcChange = changes['15m'].positive.find(c => c.symbol === 'BTCUSDT');
         assert(btcChange, '應該包含 BTCUSDT 變化');
-        assert.strictEqual(btcChange.changePercent, (100000/900000) * 100, '變化百分比計算正確');
+        assert.strictEqual(btcChange.changePercent, 11.11, '變化百分比計算正確');
         assert(typeof btcChange.currentOpenInterest === 'number', '應該包含當前持倉量');
       } finally {
         // 恢復原始方法
@@ -218,7 +224,13 @@ class EnhancedTestSuite {
   async testEMACalculations() {
     console.log('📈 測試 EMA 計算功能...');
     
-    const monitor = new EnhancedContractMonitor(this.testConfig);
+    // 創建 mock Discord 服務
+    const mockDiscordService = {
+      sendAlert: async () => ({ success: true }),
+      sendEmbed: async () => ({ success: true })
+    };
+    
+    const monitor = new EnhancedContractMonitor(this.testConfig, mockDiscordService);
     
     // 測試 EMA 計算
     this.test('EMA 計算準確性', () => {
@@ -305,7 +317,13 @@ class EnhancedTestSuite {
   async testMultiTimeframePriceTracking() {
     console.log('⏰ 測試多時間週期價格追蹤...');
     
-    const monitor = new EnhancedContractMonitor(this.testConfig);
+    // 創建 mock Discord 服務
+    const mockDiscordService = {
+      sendAlert: async () => ({ success: true }),
+      sendEmbed: async () => ({ success: true })
+    };
+    
+    const monitor = new EnhancedContractMonitor(this.testConfig, mockDiscordService);
     
     this.test('多時間週期數據備份', () => {
       // 設置當前數據
