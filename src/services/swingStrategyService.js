@@ -2,9 +2,9 @@ const BitgetApi = require('./bitgetApi');
 const DiscordService = require('./discordService');
 
 /**
- * 波段策略服務 - 重寫版本
+ * 波段策略服務 - 修正版本
  * 新策略邏輯：
- * 1. 三條均線不糾纏後20根K棒以上
+ * 1. 在60根K棒內三條均線無糾纏且K棒未觸碰EMA55
  * 2. 回踩EMA30後有陽包陰(多頭排列)或陰包陽(空頭排列)
  * 3. 等收線確認
  * 4. 返回下一根K棒開盤價，設定新的止損止盈
@@ -27,8 +27,8 @@ class SwingStrategyService {
     // 均線糾纏閾值（百分比）
     this.entanglementThreshold = 0.3; // 0.3%
     
-    // 不糾纏最小K棒數量
-    this.minNoEntanglementBars = 20;
+    // 不糾纏最小K棒數量（修正為60根K棒）
+    this.minNoEntanglementBars = 60;
     
     // 監控時間週期
     this.timeframes = ['15m', '30m', '1h'];
@@ -224,8 +224,11 @@ class SwingStrategyService {
       state.trend = 'unknown';
     }
 
-    // 只有在不糾纏20根K棒以上才進入監控狀態
-    if (state.noEntanglementCount >= this.minNoEntanglementBars) {
+    // 檢查K棒是否觸碰EMA55（在60根K棒內）
+    const touchedEMA55 = this.checkTouchedEMA55(klines, ema55, 60);
+    
+    // 只有在不糾纏60根K棒以上且未觸碰EMA55才進入監控狀態
+    if (state.noEntanglementCount >= this.minNoEntanglementBars && !touchedEMA55) {
       // 檢查回踩EMA30
       const touchEMA30 = this.checkTouchEMA30(klines, ema30, state.trend);
       
@@ -341,6 +344,31 @@ class SwingStrategyService {
     const diffPercentage = ((maxEma - minEma) / minEma) * 100;
 
     return diffPercentage <= this.entanglementThreshold;
+  }
+
+  /**
+   * 檢查K棒是否觸碰EMA55（在指定的K棒數量內）
+   */
+  checkTouchedEMA55(klines, ema55, barsToCheck = 60) {
+    // 檢查最近指定數量的K線是否觸碰EMA55
+    const startIndex = Math.max(0, klines.length - barsToCheck);
+    
+    for (let i = startIndex; i < klines.length && i < ema55.length; i++) {
+      const kline = klines[i];
+      const emaValue = ema55[i];
+      
+      if (!emaValue) continue;
+      
+      const high = parseFloat(kline.high);
+      const low = parseFloat(kline.low);
+      
+      // 檢查K線是否觸碰EMA55（高點>=EMA55 且 低點<=EMA55）
+      if (low <= emaValue && high >= emaValue) {
+        return true; // 有觸碰到EMA55
+      }
+    }
+    
+    return false; // 沒有觸碰到EMA55
   }
 
   /**
