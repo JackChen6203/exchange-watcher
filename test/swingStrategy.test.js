@@ -71,11 +71,15 @@ async function testSwingStrategy() {
      }));
     
     // 計算 EMA
-     const emaResult = swingStrategy.calculateEMAs(formattedKlineData);
-    console.log('EMA 計算結果長度:', emaResult ? emaResult.length : 'undefined');
+    const closes = formattedKlineData.map(candle => candle.close);
+    const ema12 = swingStrategy.calculateEMA(closes, 12);
+    const ema30 = swingStrategy.calculateEMA(closes, 30);
+    const ema55 = swingStrategy.calculateEMA(closes, 55);
+    
+    console.log('EMA 計算結果長度:', ema12 ? ema12.length : 'undefined');
     
     // 驗證 EMA 計算邏輯
-    if (emaResult && emaResult.length > 0) {
+    if (ema12 && ema12.length > 0 && ema30 && ema30.length > 0 && ema55 && ema55.length > 0) {
       console.log('✅ EMA 計算長度正確');
     } else {
       console.log('❌ EMA 計算長度錯誤');
@@ -84,17 +88,20 @@ async function testSwingStrategy() {
     // 測試趨勢判斷
     console.log('\n📈 測試趨勢判斷功能...');
     
-    if (emaResult && emaResult.length > 0) {
-      const mockEMAData = emaResult[emaResult.length - 1];
+    if (ema12 && ema12.length > 0 && ema30 && ema30.length > 0 && ema55 && ema55.length > 0) {
+      const lastIndex = ema12.length - 1;
+      const ema12Value = ema12[lastIndex];
+      const ema30Value = ema30[lastIndex];
+      const ema55Value = ema55[lastIndex];
       
-      console.log(`EMA 數值 - EMA12: ${mockEMAData.ema12.toFixed(4)}, EMA30: ${mockEMAData.ema30.toFixed(4)}, EMA55: ${mockEMAData.ema55.toFixed(4)}`);
+      console.log(`EMA 數值 - EMA12: ${ema12Value.toFixed(4)}, EMA30: ${ema30Value.toFixed(4)}, EMA55: ${ema55Value.toFixed(4)}`);
       
-      if (mockEMAData.ema12 > mockEMAData.ema30 && mockEMAData.ema30 > mockEMAData.ema55) {
+      if (ema12Value > ema30Value && ema30Value > ema55Value) {
         console.log('✅ 多頭排列判斷正確');
       } else {
         console.log('❌ 多頭排列判斷錯誤');
-        console.log(`條件檢查: EMA12(${mockEMAData.ema12.toFixed(4)}) > EMA30(${mockEMAData.ema30.toFixed(4)}): ${mockEMAData.ema12 > mockEMAData.ema30}`);
-        console.log(`條件檢查: EMA30(${mockEMAData.ema30.toFixed(4)}) > EMA55(${mockEMAData.ema55.toFixed(4)}): ${mockEMAData.ema30 > mockEMAData.ema55}`);
+        console.log(`條件檢查: EMA12(${ema12Value.toFixed(4)}) > EMA30(${ema30Value.toFixed(4)}): ${ema12Value > ema30Value}`);
+        console.log(`條件檢查: EMA30(${ema30Value.toFixed(4)}) > EMA55(${ema55Value.toFixed(4)}): ${ema30Value > ema55Value}`);
       }
     } else {
       console.log('EMA 數據不足，跳過趨勢判斷測試');
@@ -103,22 +110,25 @@ async function testSwingStrategy() {
     // 測試均線糾纏檢測
     console.log('\n🔄 測試均線糾纏檢測...');
     
-    if (emaResult && emaResult.length > 0) {
-      const mockEMAData = emaResult[emaResult.length - 1];
+    if (ema12 && ema12.length > 0 && ema30 && ema30.length > 0 && ema55 && ema55.length > 0) {
+      const lastIndex = ema12.length - 1;
+      const ema12Value = ema12[lastIndex];
+      const ema30Value = ema30[lastIndex];
+      const ema55Value = ema55[lastIndex];
       
       // 計算均線間距離百分比
-      const avgPrice = (mockEMAData.ema12 + mockEMAData.ema30 + mockEMAData.ema55) / 3;
-      const diff12_30 = Math.abs(mockEMAData.ema12 - mockEMAData.ema30) / avgPrice;
-      const diff30_55 = Math.abs(mockEMAData.ema30 - mockEMAData.ema55) / avgPrice;
-      const diff12_55 = Math.abs(mockEMAData.ema12 - mockEMAData.ema55) / avgPrice;
+      const avgPrice = (ema12Value + ema30Value + ema55Value) / 3;
+      const diff12_30 = Math.abs(ema12Value - ema30Value) / avgPrice;
+      const diff30_55 = Math.abs(ema30Value - ema55Value) / avgPrice;
+      const diff12_55 = Math.abs(ema12Value - ema55Value) / avgPrice;
       
       console.log(`均線距離百分比:`);
       console.log(`  EMA12-EMA30: ${(diff12_30 * 100).toFixed(4)}%`);
       console.log(`  EMA30-EMA55: ${(diff30_55 * 100).toFixed(4)}%`);
       console.log(`  EMA12-EMA55: ${(diff12_55 * 100).toFixed(4)}%`);
-      console.log(`  糾纏閾值: ${(swingStrategy.entanglementThreshold * 100).toFixed(4)}%`);
+      console.log(`  糾纏閾值: ${swingStrategy.entanglementThreshold}%`);
       
-      const entanglementResult = swingStrategy.checkEntanglement(mockEMAData);
+      const entanglementResult = swingStrategy.checkEntanglement(ema12Value, ema30Value, ema55Value);
       console.log('均線糾纏檢測結果:', entanglementResult ? '❌ 糾纏' : '✅ 未糾纏');
     } else {
       console.log('EMA 數據不足，跳過均線糾纏檢測測試');
